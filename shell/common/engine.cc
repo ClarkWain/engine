@@ -192,6 +192,12 @@ bool Engine::Restart(RunConfiguration configuration) {
 }
 
 Engine::RunStatus Engine::Run(RunConfiguration configuration) {
+    FML_DLOG(ERROR) << "********** -恭喜恭喜- **********";
+    FML_DLOG(ERROR) << "********** -恭喜恭喜- **********";
+    FML_DLOG(ERROR) << "****** -自编译引擎启动成功- ******";
+    FML_DLOG(ERROR) << "********** -恭喜恭喜- **********";
+    FML_DLOG(ERROR) << "********** -恭喜恭喜- **********";
+    
   if (!configuration.IsValid()) {
     FML_LOG(ERROR) << "Engine run configuration was invalid.";
     return RunStatus::Failure;
