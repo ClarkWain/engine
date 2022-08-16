@@ -5,11 +5,16 @@
 #ifndef FLUTTER_SHELL_PLATFORM_WINDOWS_FLUTTER_WINDOWS_ENGINE_H_
 #define FLUTTER_SHELL_PLATFORM_WINDOWS_FLUTTER_WINDOWS_ENGINE_H_
 
+#include <chrono>
 #include <map>
 #include <memory>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
 
+#include "flutter/fml/closure.h"
+#include "flutter/shell/platform/common/accessibility_bridge.h"
 #include "flutter/shell/platform/common/client_wrapper/binary_messenger_impl.h"
 #include "flutter/shell/platform/common/client_wrapper/include/flutter/basic_message_channel.h"
 #include "flutter/shell/platform/common/incoming_message_dispatcher.h"
@@ -18,17 +23,41 @@
 #include "flutter/shell/platform/windows/flutter_project_bundle.h"
 #include "flutter/shell/platform/windows/flutter_windows_texture_registrar.h"
 #include "flutter/shell/platform/windows/public/flutter_windows.h"
+#include "flutter/shell/platform/windows/settings_plugin.h"
 #include "flutter/shell/platform/windows/task_runner.h"
+#include "flutter/shell/platform/windows/window_proc_delegate_manager.h"
 #include "flutter/shell/platform/windows/window_state.h"
 #include "third_party/rapidjson/include/rapidjson/document.h"
-
-#ifndef WINUWP
-#include "flutter/shell/platform/windows/window_proc_delegate_manager_win32.h"  // nogncheck
-#endif
 
 namespace flutter {
 
 class FlutterWindowsView;
+
+// Update the thread priority for the Windows engine.
+static void WindowsPlatformThreadPrioritySetter(
+    FlutterThreadPriority priority) {
+  // TODO(99502): Add support for tracing to the windows embedding so we can
+  // mark thread priorities and success/failure.
+  switch (priority) {
+    case FlutterThreadPriority::kBackground: {
+      SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+      break;
+    }
+    case FlutterThreadPriority::kDisplay: {
+      SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+      break;
+    }
+    case FlutterThreadPriority::kRaster: {
+      SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+      break;
+    }
+    case FlutterThreadPriority::kNormal: {
+      // For normal or default priority we do not need to set the priority
+      // class.
+      break;
+    }
+  }
+}
 
 // Manages state associated with the underlying FlutterEngine that isn't
 // related to its display.
@@ -46,11 +75,22 @@ class FlutterWindowsEngine {
   FlutterWindowsEngine(FlutterWindowsEngine const&) = delete;
   FlutterWindowsEngine& operator=(FlutterWindowsEngine const&) = delete;
 
-  // Starts running the engine with the given entrypoint. If null, defaults to
-  // main().
+  // Starts running the entrypoint function specifed in the project bundle. If
+  // unspecified, defaults to main().
   //
   // Returns false if the engine couldn't be started.
-  bool RunWithEntrypoint(const char* entrypoint);
+  bool Run();
+
+  // Starts running the engine with the given entrypoint. If the empty string
+  // is specified, defaults to the entrypoint function specified in the project
+  // bundle, or main() if both are unspecified.
+  //
+  // Returns false if the engine couldn't be started or if conflicting,
+  // non-default values are passed here and in the project bundle..
+  //
+  // DEPRECATED: Prefer setting the entrypoint in the FlutterProjectBundle
+  // passed to the constructor and calling the no-parameter overload.
+  bool Run(std::string_view entrypoint);
 
   // Returns true if the engine is currently running.
   bool running() { return engine_ != nullptr; }
@@ -70,9 +110,10 @@ class FlutterWindowsEngine {
   // Returns the currently configured Plugin Registrar.
   FlutterDesktopPluginRegistrarRef GetRegistrar();
 
-  // Sets |callback| to be called when the plugin registrar is destroyed.
-  void SetPluginRegistrarDestructionCallback(
-      FlutterDesktopOnPluginRegistrarDestroyed callback);
+  // Registers |callback| to be called when the plugin registrar is destroyed.
+  void AddPluginRegistrarDestructionCallback(
+      FlutterDesktopOnPluginRegistrarDestroyed callback,
+      FlutterDesktopPluginRegistrarRef registrar);
 
   // Sets switches member to the given switches.
   void SetSwitches(const std::vector<std::string>& switches);
@@ -93,11 +134,13 @@ class FlutterWindowsEngine {
   // rendering using software instead of OpenGL.
   AngleSurfaceManager* surface_manager() { return surface_manager_.get(); }
 
-#ifndef WINUWP
-  WindowProcDelegateManagerWin32* window_proc_delegate_manager() {
+  std::weak_ptr<AccessibilityBridge> accessibility_bridge() {
+    return accessibility_bridge_;
+  }
+
+  WindowProcDelegateManager* window_proc_delegate_manager() {
     return window_proc_delegate_manager_.get();
   }
-#endif
 
   // Informs the engine that the window metrics have changed.
   void SendWindowMetricsEvent(const FlutterWindowMetricsEvent& event);
@@ -131,8 +174,11 @@ class FlutterWindowsEngine {
   // Informs the engine that the system font list has changed.
   void ReloadSystemFonts();
 
-  // Informs the engine that the platform brightness has changed.
-  void ReloadPlatformBrightness();
+  // Informs the engine that a new frame is needed to redraw the content.
+  void ScheduleFrame();
+
+  // Set the callback that is called when the next frame is drawn.
+  void SetNextFrameCallback(fml::closure callback);
 
   // Attempts to register the texture with the given |texture_id|.
   bool RegisterExternalTexture(int64_t texture_id);
@@ -144,15 +190,45 @@ class FlutterWindowsEngine {
   // given |texture_id|.
   bool MarkExternalTextureFrameAvailable(int64_t texture_id);
 
+  // Invoke on the embedder's vsync callback to schedule a frame.
+  void OnVsync(intptr_t baton);
+
+  // Dispatches a semantics action to the specified semantics node.
+  bool DispatchSemanticsAction(uint64_t id,
+                               FlutterSemanticsAction action,
+                               fml::MallocMapping data);
+
+  // Informs the engine that the semantics enabled state has changed.
+  void UpdateSemanticsEnabled(bool enabled);
+
+  // Returns true if the semantics tree is enabled.
+  bool semantics_enabled() const { return semantics_enabled_; }
+
+  // Returns the native accessibility node with the given id.
+  gfx::NativeViewAccessible GetNativeAccessibleFromId(AccessibilityNodeId id);
+
+  // Register a root isolate create callback.
+  //
+  // The root isolate create callback is invoked at creation of the root Dart
+  // isolate in the app. This may be used to be notified that execution of the
+  // main Dart entrypoint is about to begin, and is used by test infrastructure
+  // to register a native function resolver that can register and resolve
+  // functions marked as native in the Dart code.
+  //
+  // This must be called before calling |Run|.
+  void SetRootIsolateCreateCallback(const fml::closure& callback) {
+    root_isolate_create_callback_ = callback;
+  }
+
  private:
   // Allows swapping out embedder_api_ calls in tests.
   friend class EngineModifier;
 
-  // Sends system settings (e.g., locale) to the engine.
+  // Sends system locales to the engine.
   //
   // Should be called just after the engine is run, and after any relevant
   // system changes.
-  void SendSystemSettings();
+  void SendSystemLocales();
 
   // The handle to the embedder.h engine instance.
   FLUTTER_API_SYMBOL(FlutterEngine) engine_ = nullptr;
@@ -193,18 +269,37 @@ class FlutterWindowsEngine {
   // May be nullptr if ANGLE failed to initialize.
   std::unique_ptr<AngleSurfaceManager> surface_manager_;
 
-  // The MethodChannel used for communication with the Flutter engine.
-  std::unique_ptr<BasicMessageChannel<rapidjson::Document>> settings_channel_;
+  // The settings plugin.
+  std::unique_ptr<SettingsPlugin> settings_plugin_;
 
-  // A callback to be called when the engine (and thus the plugin registrar)
-  // is being destroyed.
-  FlutterDesktopOnPluginRegistrarDestroyed
-      plugin_registrar_destruction_callback_ = nullptr;
+  // Callbacks to be called when the engine (and thus the plugin registrar) is
+  // being destroyed.
+  std::map<FlutterDesktopOnPluginRegistrarDestroyed,
+           FlutterDesktopPluginRegistrarRef>
+      plugin_registrar_destruction_callbacks_;
 
-#ifndef WINUWP
+  // The approximate time between vblank events.
+  std::chrono::nanoseconds FrameInterval();
+
+  // The start time used to align frames.
+  std::chrono::nanoseconds start_time_ = std::chrono::nanoseconds::zero();
+
+  // An override of the frame interval used by EngineModifier for testing.
+  std::optional<std::chrono::nanoseconds> frame_interval_override_ =
+      std::nullopt;
+
+  bool semantics_enabled_ = false;
+
+  std::shared_ptr<AccessibilityBridge> accessibility_bridge_;
+
   // The manager for WindowProc delegate registration and callbacks.
-  std::unique_ptr<WindowProcDelegateManagerWin32> window_proc_delegate_manager_;
-#endif
+  std::unique_ptr<WindowProcDelegateManager> window_proc_delegate_manager_;
+
+  // The root isolate creation callback.
+  fml::closure root_isolate_create_callback_;
+
+  // The on frame drawn callback.
+  fml::closure next_frame_callback_;
 };
 
 }  // namespace flutter

@@ -162,13 +162,15 @@ void MultiFrameCodec::State::GetNextFrameAndInvokeCallback(
       GetNextFrameImage(resourceContext, gpu_disable_sync_switch);
   if (skImage) {
     image = CanvasImage::Create();
-    image->set_image({skImage, std::move(unref_queue)});
+    image->set_image(DlImageGPU::Make({skImage, std::move(unref_queue)}));
     ImageGenerator::FrameInfo frameInfo =
         generator_->GetFrameInfo(nextFrameIndex_);
     duration = frameInfo.duration;
   }
   nextFrameIndex_ = (nextFrameIndex_ + 1) % frameCount_;
 
+  // The static leak checker gets confused by the use of fml::MakeCopyable.
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   ui_task_runner->PostTask(fml::MakeCopyable([callback = std::move(callback),
                                               image = std::move(image),
                                               duration, trace_id]() mutable {
@@ -219,6 +221,9 @@ Dart_Handle MultiFrameCodec::getNextFrame(Dart_Handle callback_handle) {
       }));
 
   return Dart_Null();
+  // The static leak checker gets confused by the control flow, unique pointers
+  // and closures in this function.
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
 }
 
 int MultiFrameCodec::frameCount() const {

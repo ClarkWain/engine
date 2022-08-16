@@ -14,10 +14,10 @@ void main() {
 }
 
 Future<void> testMain() async {
-  setUp(() async {
+  setUpAll(() async {
     await webOnlyInitializePlatform();
-    webOnlyFontCollection.debugRegisterTestFonts();
-    await webOnlyFontCollection.ensureFontsLoaded();
+    fontCollection.debugRegisterTestFonts();
+    await fontCollection.ensureFontsLoaded();
   });
 
   Future<Image> createTestImageByColor(Color color) async {
@@ -34,7 +34,7 @@ Future<void> testMain() async {
     final Image testImage = await createTestImageByColor(const Color(0xFFCCDD00));
 
     final ByteData bytes =
-        (await testImage.toByteData(format: ImageByteFormat.rawRgba))!;
+        (await testImage.toByteData())!;
     expect(
       bytes.buffer.asUint32List(),
       <int>[0xFF00DDCC, 0xFF00DDCC, 0xFF00DDCC, 0xFF00DDCC],

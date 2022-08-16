@@ -191,6 +191,9 @@ sk_sp<SkData> ParseBase64(const std::string& input) {
 }
 
 size_t PersistentCache::PrecompileKnownSkSLs(GrDirectContext* context) const {
+  // clang-tidy has trouble reasoning about some of the complicated array and
+  // pointer-arithmetic code in rapidjson.
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.PlacementNew)
   auto known_sksls = LoadSkSLs();
   // A trace must be present even if no precompilations have been completed.
   FML_TRACE_EVENT("flutter", "PersistentCache::PrecompileKnownSkSLs", "count",
@@ -253,7 +256,7 @@ std::vector<PersistentCache::SkSLCache> PersistentCache::LoadSkSLs() const {
     rapidjson::ParseResult parse_result =
         json_doc.Parse(reinterpret_cast<const char*>(mapping->GetMapping()),
                        mapping->GetSize());
-    if (parse_result != rapidjson::ParseErrorCode::kParseErrorNone) {
+    if (parse_result.IsError()) {
       FML_LOG(ERROR) << "Failed to parse json file: " << kAssetFileName;
     } else {
       for (auto& item : json_doc["data"].GetObject()) {
@@ -329,7 +332,7 @@ sk_sp<SkData> PersistentCache::load(const SkData& key) {
     return nullptr;
   }
   auto file_name = SkKeyToFilePath(key);
-  if (file_name.size() == 0) {
+  if (file_name.empty()) {
     return nullptr;
   }
   auto result =
@@ -344,6 +347,8 @@ static void PersistentCacheStore(fml::RefPtr<fml::TaskRunner> worker,
                                  std::shared_ptr<fml::UniqueFD> cache_directory,
                                  std::string key,
                                  std::unique_ptr<fml::Mapping> value) {
+  // The static leak checker gets confused by the use of fml::MakeCopyable.
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   auto task = fml::MakeCopyable([cache_directory,             //
                                  file_name = std::move(key),  //
                                  mapping = std::move(value)   //
@@ -402,7 +407,7 @@ void PersistentCache::store(const SkData& key, const SkData& data) {
 
   auto file_name = SkKeyToFilePath(key);
 
-  if (file_name.size() == 0) {
+  if (file_name.empty()) {
     return;
   }
 

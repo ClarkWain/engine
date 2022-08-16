@@ -2,13 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// This is testing some of the named constants.
+// ignore_for_file: use_named_constants
+
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:litetest/litetest.dart';
+import 'package:path/path.dart' as path;
 
-void testFontWeightLerp() {
+Future<Uint8List> readFile(String fileName) async {
+  final File file = File(path.join('flutter', 'testing', 'resources', fileName));
+  return file.readAsBytes();
+}
+
+void testFontWeight() {
   test('FontWeight.lerp works with non-null values', () {
     expect(FontWeight.lerp(FontWeight.w400, FontWeight.w600, .5), equals(FontWeight.w500));
   });
@@ -23,6 +34,18 @@ void testFontWeightLerp() {
 
   test('FontWeight.lerp returns FontWeight.w400 if b is null', () {
     expect(FontWeight.lerp(FontWeight.w400, null, 1), equals(FontWeight.w400));
+  });
+
+  test('FontWeights have the correct value', () {
+    expect(FontWeight.w100.value, 100);
+    expect(FontWeight.w200.value, 200);
+    expect(FontWeight.w300.value, 300);
+    expect(FontWeight.w400.value, 400);
+    expect(FontWeight.w500.value, 500);
+    expect(FontWeight.w600.value, 600);
+    expect(FontWeight.w700.value, 700);
+    expect(FontWeight.w800.value, 800);
+    expect(FontWeight.w900.value, 900);
   });
 }
 
@@ -50,23 +73,23 @@ void testTextStyle() {
   test('TextStyle toString works', () {
     expect(
       ts0.toString(),
-      equals('TextStyle(color: unspecified, decoration: unspecified, decorationColor: unspecified, decorationStyle: unspecified, decorationThickness: unspecified, fontWeight: FontWeight.w700, fontStyle: unspecified, textBaseline: unspecified, fontFamily: unspecified, fontFamilyFallback: unspecified, fontSize: 12.0, letterSpacing: unspecified, wordSpacing: unspecified, height: 123.0x, leadingDistribution: unspecified, locale: unspecified, background: unspecified, foreground: unspecified, shadows: unspecified, fontFeatures: unspecified)'),
+      equals('TextStyle(color: unspecified, decoration: unspecified, decorationColor: unspecified, decorationStyle: unspecified, decorationThickness: unspecified, fontWeight: FontWeight.w700, fontStyle: unspecified, textBaseline: unspecified, fontFamily: unspecified, fontFamilyFallback: unspecified, fontSize: 12.0, letterSpacing: unspecified, wordSpacing: unspecified, height: 123.0x, leadingDistribution: unspecified, locale: unspecified, background: unspecified, foreground: unspecified, shadows: unspecified, fontFeatures: unspecified, fontVariations: unspecified)'),
     );
     expect(
       ts1.toString(),
-      equals('TextStyle(color: Color(0xff00ff00), decoration: unspecified, decorationColor: unspecified, decorationStyle: unspecified, decorationThickness: unspecified, fontWeight: FontWeight.w800, fontStyle: unspecified, textBaseline: unspecified, fontFamily: unspecified, fontFamilyFallback: unspecified, fontSize: 10.0, letterSpacing: unspecified, wordSpacing: unspecified, height: 100.0x, leadingDistribution: unspecified, locale: unspecified, background: unspecified, foreground: unspecified, shadows: unspecified, fontFeatures: unspecified)'),
+      equals('TextStyle(color: Color(0xff00ff00), decoration: unspecified, decorationColor: unspecified, decorationStyle: unspecified, decorationThickness: unspecified, fontWeight: FontWeight.w800, fontStyle: unspecified, textBaseline: unspecified, fontFamily: unspecified, fontFamilyFallback: unspecified, fontSize: 10.0, letterSpacing: unspecified, wordSpacing: unspecified, height: 100.0x, leadingDistribution: unspecified, locale: unspecified, background: unspecified, foreground: unspecified, shadows: unspecified, fontFeatures: unspecified, fontVariations: unspecified)'),
     );
     expect(
       ts2.toString(),
-      equals('TextStyle(color: unspecified, decoration: unspecified, decorationColor: unspecified, decorationStyle: unspecified, decorationThickness: unspecified, fontWeight: unspecified, fontStyle: unspecified, textBaseline: unspecified, fontFamily: test, fontFamilyFallback: unspecified, fontSize: unspecified, letterSpacing: unspecified, wordSpacing: unspecified, height: unspecified, leadingDistribution: unspecified, locale: unspecified, background: unspecified, foreground: unspecified, shadows: unspecified, fontFeatures: unspecified)'),
+      equals('TextStyle(color: unspecified, decoration: unspecified, decorationColor: unspecified, decorationStyle: unspecified, decorationThickness: unspecified, fontWeight: unspecified, fontStyle: unspecified, textBaseline: unspecified, fontFamily: test, fontFamilyFallback: unspecified, fontSize: unspecified, letterSpacing: unspecified, wordSpacing: unspecified, height: unspecified, leadingDistribution: unspecified, locale: unspecified, background: unspecified, foreground: unspecified, shadows: unspecified, fontFeatures: unspecified, fontVariations: unspecified)'),
     );
     expect(
       ts3.toString(),
-      equals('TextStyle(color: unspecified, decoration: unspecified, decorationColor: unspecified, decorationStyle: unspecified, decorationThickness: unspecified, fontWeight: unspecified, fontStyle: unspecified, textBaseline: unspecified, fontFamily: foo, fontFamilyFallback: [Roboto, test], fontSize: unspecified, letterSpacing: unspecified, wordSpacing: unspecified, height: unspecified, leadingDistribution: unspecified, locale: unspecified, background: unspecified, foreground: unspecified, shadows: unspecified, fontFeatures: unspecified)'),
+      equals('TextStyle(color: unspecified, decoration: unspecified, decorationColor: unspecified, decorationStyle: unspecified, decorationThickness: unspecified, fontWeight: unspecified, fontStyle: unspecified, textBaseline: unspecified, fontFamily: foo, fontFamilyFallback: [Roboto, test], fontSize: unspecified, letterSpacing: unspecified, wordSpacing: unspecified, height: unspecified, leadingDistribution: unspecified, locale: unspecified, background: unspecified, foreground: unspecified, shadows: unspecified, fontFeatures: unspecified, fontVariations: unspecified)'),
     );
     expect(
       ts4.toString(),
-      equals('TextStyle(color: unspecified, decoration: unspecified, decorationColor: unspecified, decorationStyle: unspecified, decorationThickness: unspecified, fontWeight: unspecified, fontStyle: unspecified, textBaseline: unspecified, fontFamily: unspecified, fontFamilyFallback: unspecified, fontSize: unspecified, letterSpacing: unspecified, wordSpacing: unspecified, height: unspecified, leadingDistribution: TextLeadingDistribution.even, locale: unspecified, background: unspecified, foreground: unspecified, shadows: unspecified, fontFeatures: unspecified)'),
+      equals('TextStyle(color: unspecified, decoration: unspecified, decorationColor: unspecified, decorationStyle: unspecified, decorationThickness: unspecified, fontWeight: unspecified, fontStyle: unspecified, textBaseline: unspecified, fontFamily: unspecified, fontFamilyFallback: unspecified, fontSize: unspecified, letterSpacing: unspecified, wordSpacing: unspecified, height: unspecified, leadingDistribution: TextLeadingDistribution.even, locale: unspecified, background: unspecified, foreground: unspecified, shadows: unspecified, fontFeatures: unspecified, fontVariations: unspecified)'),
     );
   });
 }
@@ -191,41 +214,41 @@ void testLoadFontFromList() {
 
 void testFontFeatureClass() {
   test('FontFeature class', () {
-    expect(const FontFeature.alternative(1), const FontFeature('aalt', 1));
+    expect(const FontFeature.alternative(1), const FontFeature('aalt'));
     expect(const FontFeature.alternative(5), const FontFeature('aalt', 5));
-    expect(const FontFeature.alternativeFractions(), const FontFeature('afrc', 1));
-    expect(const FontFeature.contextualAlternates(), const FontFeature('calt', 1));
-    expect(const FontFeature.caseSensitiveForms(), const FontFeature('case', 1));
-    expect(      FontFeature.characterVariant(1), const FontFeature('cv01', 1));
-    expect(      FontFeature.characterVariant(18), const FontFeature('cv18', 1));
-    expect(      FontFeature.characterVariant(99), const FontFeature('cv99', 1));
-    expect(const FontFeature.denominator(), const FontFeature('dnom', 1));
-    expect(const FontFeature.fractions(), const FontFeature('frac', 1));
-    expect(const FontFeature.historicalForms(), const FontFeature('hist', 1));
-    expect(const FontFeature.historicalLigatures(), const FontFeature('hlig', 1));
-    expect(const FontFeature.liningFigures(), const FontFeature('lnum', 1));
-    expect(const FontFeature.localeAware(), const FontFeature('locl', 1));
-    expect(const FontFeature.localeAware(enable: true), const FontFeature('locl', 1));
+    expect(const FontFeature.alternativeFractions(), const FontFeature('afrc'));
+    expect(const FontFeature.contextualAlternates(), const FontFeature('calt'));
+    expect(const FontFeature.caseSensitiveForms(), const FontFeature('case'));
+    expect(      FontFeature.characterVariant(1), const FontFeature('cv01'));
+    expect(      FontFeature.characterVariant(18), const FontFeature('cv18'));
+    expect(      FontFeature.characterVariant(99), const FontFeature('cv99'));
+    expect(const FontFeature.denominator(), const FontFeature('dnom'));
+    expect(const FontFeature.fractions(), const FontFeature('frac'));
+    expect(const FontFeature.historicalForms(), const FontFeature('hist'));
+    expect(const FontFeature.historicalLigatures(), const FontFeature('hlig'));
+    expect(const FontFeature.liningFigures(), const FontFeature('lnum'));
+    expect(const FontFeature.localeAware(), const FontFeature('locl'));
+    expect(const FontFeature.localeAware(), const FontFeature('locl'));
     expect(const FontFeature.localeAware(enable: false), const FontFeature('locl', 0));
-    expect(const FontFeature.notationalForms(), const FontFeature('nalt', 1));
+    expect(const FontFeature.notationalForms(), const FontFeature('nalt'));
     expect(const FontFeature.notationalForms(5), const FontFeature('nalt', 5));
-    expect(const FontFeature.numerators(), const FontFeature('numr', 1));
-    expect(const FontFeature.oldstyleFigures(), const FontFeature('onum', 1));
-    expect(const FontFeature.ordinalForms(), const FontFeature('ordn', 1));
-    expect(const FontFeature.proportionalFigures(), const FontFeature('pnum', 1));
-    expect(const FontFeature.randomize(), const FontFeature('rand', 1));
-    expect(const FontFeature.stylisticAlternates(), const FontFeature('salt', 1));
-    expect(const FontFeature.scientificInferiors(), const FontFeature('sinf', 1));
-    expect(      FontFeature.stylisticSet(1), const FontFeature('ss01', 1));
-    expect(      FontFeature.stylisticSet(18), const FontFeature('ss18', 1));
-    expect(const FontFeature.subscripts(), const FontFeature('subs', 1));
-    expect(const FontFeature.superscripts(), const FontFeature('sups', 1));
-    expect(const FontFeature.swash(), const FontFeature('swsh', 1));
+    expect(const FontFeature.numerators(), const FontFeature('numr'));
+    expect(const FontFeature.oldstyleFigures(), const FontFeature('onum'));
+    expect(const FontFeature.ordinalForms(), const FontFeature('ordn'));
+    expect(const FontFeature.proportionalFigures(), const FontFeature('pnum'));
+    expect(const FontFeature.randomize(), const FontFeature('rand'));
+    expect(const FontFeature.stylisticAlternates(), const FontFeature('salt'));
+    expect(const FontFeature.scientificInferiors(), const FontFeature('sinf'));
+    expect(      FontFeature.stylisticSet(1), const FontFeature('ss01'));
+    expect(      FontFeature.stylisticSet(18), const FontFeature('ss18'));
+    expect(const FontFeature.subscripts(), const FontFeature('subs'));
+    expect(const FontFeature.superscripts(), const FontFeature('sups'));
+    expect(const FontFeature.swash(), const FontFeature('swsh'));
     expect(const FontFeature.swash(0), const FontFeature('swsh', 0));
     expect(const FontFeature.swash(5), const FontFeature('swsh', 5));
-    expect(const FontFeature.tabularFigures(), const FontFeature('tnum', 1));
-    expect(const FontFeature.slashedZero(), const FontFeature('zero', 1));
-    expect(const FontFeature.enable('TEST'), const FontFeature('TEST', 1));
+    expect(const FontFeature.tabularFigures(), const FontFeature('tnum'));
+    expect(const FontFeature.slashedZero(), const FontFeature('zero'));
+    expect(const FontFeature.enable('TEST'), const FontFeature('TEST'));
     expect(const FontFeature.disable('TEST'), const FontFeature('TEST', 0));
     expect(const FontFeature('FEAT', 1000).feature, 'FEAT');
     expect(const FontFeature('FEAT', 1000).value, 1000);
@@ -233,12 +256,45 @@ void testFontFeatureClass() {
   });
 }
 
+void testFontVariation() {
+  test('FontVariation', () async {
+    final Uint8List fontData = await readFile('RobotoSlab-VariableFont_wght.ttf');
+    await loadFontFromList(fontData, fontFamily: 'RobotoSerif');
+
+    final ParagraphBuilder baseBuilder = ParagraphBuilder(ParagraphStyle(
+      fontFamily: 'RobotoSerif',
+      fontSize: 40.0,
+    ));
+    baseBuilder.addText('Hello');
+    final Paragraph baseParagraph = baseBuilder.build();
+    baseParagraph.layout(const ParagraphConstraints(width: double.infinity));
+    final double baseWidth = baseParagraph.minIntrinsicWidth;
+
+    final ParagraphBuilder wideBuilder = ParagraphBuilder(ParagraphStyle(
+      fontFamily: 'RobotoSerif',
+      fontSize: 40.0,
+    ));
+    wideBuilder.pushStyle(TextStyle(
+      fontFamily: 'RobotoSerif',
+      fontSize: 40.0,
+      fontVariations: <FontVariation>[const FontVariation('wght', 900.0)],
+    ));
+    wideBuilder.addText('Hello');
+    final Paragraph wideParagraph = wideBuilder.build();
+    wideParagraph.layout(const ParagraphConstraints(width: double.infinity));
+    final double wideWidth = wideParagraph.minIntrinsicWidth;
+
+    expect(wideWidth, greaterThan(baseWidth));
+  });
+}
+
 void main() {
-  testFontWeightLerp();
+  testFontWeight();
   testParagraphStyle();
   testTextStyle();
   testTextHeightBehavior();
   testTextRange();
   testLoadFontFromList();
   testFontFeatureClass();
+  testFontVariation();
 }

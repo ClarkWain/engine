@@ -34,6 +34,7 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
 - (void)dealloc {
   [_lifeCycleDelegate release];
   [_rootFlutterViewControllerGetter release];
+  [_window release];
   [super dealloc];
 }
 
@@ -95,6 +96,12 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
       didRegisterForRemoteNotificationsWithDeviceToken:deviceToken];
 }
 
+- (void)application:(UIApplication*)application
+    didFailToRegisterForRemoteNotificationsWithError:(NSError*)error {
+  [_lifeCycleDelegate application:application
+      didFailToRegisterForRemoteNotificationsWithError:error];
+}
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 - (void)application:(UIApplication*)application
@@ -106,14 +113,11 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
 - (void)userNotificationCenter:(UNUserNotificationCenter*)center
        willPresentNotification:(UNNotification*)notification
          withCompletionHandler:
-             (void (^)(UNNotificationPresentationOptions options))completionHandler
-    NS_AVAILABLE_IOS(10_0) {
-  if (@available(iOS 10.0, *)) {
-    if ([_lifeCycleDelegate respondsToSelector:_cmd]) {
-      [_lifeCycleDelegate userNotificationCenter:center
-                         willPresentNotification:notification
-                           withCompletionHandler:completionHandler];
-    }
+             (void (^)(UNNotificationPresentationOptions options))completionHandler {
+  if ([_lifeCycleDelegate respondsToSelector:_cmd]) {
+    [_lifeCycleDelegate userNotificationCenter:center
+                       willPresentNotification:notification
+                         withCompletionHandler:completionHandler];
   }
 }
 
@@ -122,13 +126,11 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
  */
 - (void)userNotificationCenter:(UNUserNotificationCenter*)center
     didReceiveNotificationResponse:(UNNotificationResponse*)response
-             withCompletionHandler:(void (^)(void))completionHandler NS_AVAILABLE_IOS(10_0) {
-  if (@available(iOS 10.0, *)) {
-    if ([_lifeCycleDelegate respondsToSelector:_cmd]) {
-      [_lifeCycleDelegate userNotificationCenter:center
-                  didReceiveNotificationResponse:response
-                           withCompletionHandler:completionHandler];
-    }
+             withCompletionHandler:(void (^)(void))completionHandler {
+  if ([_lifeCycleDelegate respondsToSelector:_cmd]) {
+    [_lifeCycleDelegate userNotificationCenter:center
+                didReceiveNotificationResponse:response
+                         withCompletionHandler:completionHandler];
   }
 }
 
@@ -192,7 +194,7 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
 
 - (void)application:(UIApplication*)application
     performActionForShortcutItem:(UIApplicationShortcutItem*)shortcutItem
-               completionHandler:(void (^)(BOOL succeeded))completionHandler NS_AVAILABLE_IOS(9_0) {
+               completionHandler:(void (^)(BOOL succeeded))completionHandler {
   [_lifeCycleDelegate application:application
       performActionForShortcutItem:shortcutItem
                  completionHandler:completionHandler];
@@ -206,16 +208,10 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
                         completionHandler:completionHandler];
 }
 
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 120000
 - (BOOL)application:(UIApplication*)application
     continueUserActivity:(NSUserActivity*)userActivity
       restorationHandler:(void (^)(NSArray<id<UIUserActivityRestoring>>* __nullable
                                        restorableObjects))restorationHandler {
-#else
-- (BOOL)application:(UIApplication*)application
-    continueUserActivity:(NSUserActivity*)userActivity
-      restorationHandler:(void (^)(NSArray* __nullable restorableObjects))restorationHandler {
-#endif
   if ([_lifeCycleDelegate application:application
                  continueUserActivity:userActivity
                    restorationHandler:restorationHandler]) {

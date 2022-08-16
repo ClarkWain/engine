@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:html' as html;
 import 'dart:math' as math;
 
 import 'package:test/bootstrap/browser.dart';
@@ -22,7 +21,7 @@ Future<void> testMain() async {
   const Rect screenRect = Rect.fromLTWH(0, 0, screenWidth, screenHeight);
 
   // Commit a recording canvas to a bitmap, and compare with the expected
-  Future<void> _checkScreenshot(RecordingCanvas rc, String fileName,
+  Future<void> checkScreenshot(RecordingCanvas rc, String fileName,
       {Rect region = const Rect.fromLTWH(0, 0, 500, 500),
       double? maxDiffRatePercent}) async {
     final EngineCanvas engineCanvas = BitmapCanvas(screenRect,
@@ -31,10 +30,16 @@ Future<void> testMain() async {
     rc.apply(engineCanvas, screenRect);
 
     // Wrap in <flt-scene> so that our CSS selectors kick in.
-    final html.Element sceneElement = html.Element.tag('flt-scene');
+    final DomElement sceneElement = createDomElement('flt-scene');
+    if (isIosSafari) {
+      // Shrink to fit on the iPhone screen.
+      sceneElement.style.position = 'absolute';
+      sceneElement.style.transformOrigin = '0 0 0';
+      sceneElement.style.transform = 'scale(0.3)';
+    }
     try {
       sceneElement.append(engineCanvas.rootElement);
-      html.document.body!.append(sceneElement);
+      domDocument.body!.append(sceneElement);
       await matchGoldenFile('$fileName.png', region: region, maxDiffRatePercent: maxDiffRatePercent);
     } finally {
       // The page is reused across tests, so remove the element after taking the
@@ -43,11 +48,11 @@ Future<void> testMain() async {
     }
   }
 
-  setUp(() async {
+  setUpAll(() async {
     debugEmulateFlutterTesterEnvironment = true;
     await webOnlyInitializePlatform();
-    webOnlyFontCollection.debugRegisterTestFonts();
-    await webOnlyFontCollection.ensureFontsLoaded();
+    fontCollection.debugRegisterTestFonts();
+    await fontCollection.ensureFontsLoaded();
   });
 
   test('Should draw transformed line.', () async {
@@ -73,7 +78,7 @@ Future<void> testMain() async {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0
           ..color = const Color.fromRGBO(0, 128, 255, 1.0));
-    await _checkScreenshot(rc, 'path_transform_with_line');
+    await checkScreenshot(rc, 'path_transform_with_line');
   });
 
   test('Should draw transformed line.', () async {
@@ -98,7 +103,7 @@ Future<void> testMain() async {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0
           ..color = const Color.fromRGBO(0, 128, 255, 1.0));
-    await _checkScreenshot(rc, 'path_transform_with_rect');
+    await checkScreenshot(rc, 'path_transform_with_rect');
   });
 
   test('Should draw transformed quadratic curve.', () async {
@@ -124,7 +129,7 @@ Future<void> testMain() async {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0
           ..color = const Color.fromRGBO(0, 128, 255, 1.0));
-    await _checkScreenshot(rc, 'path_transform_with_quadratic_curve');
+    await checkScreenshot(rc, 'path_transform_with_quadratic_curve');
   });
 
   test('Should draw transformed conic.', () async {
@@ -161,7 +166,7 @@ Future<void> testMain() async {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0
           ..color = const Color.fromRGBO(0, 128, 255, 1.0));
-    await _checkScreenshot(rc, 'path_transform_with_conic');
+    await checkScreenshot(rc, 'path_transform_with_conic');
   });
 
   test('Should draw transformed arc.', () async {
@@ -173,8 +178,7 @@ Future<void> testMain() async {
     path.arcToPoint(const Offset(450, 90),
         radius: const Radius.elliptical(200, 50),
         rotation: -math.pi / 6.0,
-        largeArc: true,
-        clockwise: true);
+        largeArc: true);
     path.close();
 
     rc.drawPath(
@@ -195,7 +199,7 @@ Future<void> testMain() async {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0
           ..color = const Color.fromRGBO(0, 128, 255, 1.0));
-    await _checkScreenshot(rc, 'path_transform_with_arc',
+    await checkScreenshot(rc, 'path_transform_with_arc',
         maxDiffRatePercent: 1.4);
   });
 
@@ -224,6 +228,6 @@ Future<void> testMain() async {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0
           ..color = const Color.fromRGBO(0, 128, 255, 1.0));
-    await _checkScreenshot(rc, 'path_transform_with_rrect');
+    await checkScreenshot(rc, 'path_transform_with_rrect');
   });
 }

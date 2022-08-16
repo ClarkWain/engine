@@ -4,8 +4,6 @@
 
 @TestOn('chrome || safari || firefox')
 
-import 'dart:html' as html;
-
 import 'package:test/bootstrap/browser.dart';
 import 'package:test/test.dart';
 
@@ -14,9 +12,7 @@ import 'package:ui/ui.dart' as ui;
 
 import 'semantics_tester.dart';
 
-final InputConfiguration singlelineConfig = InputConfiguration(
-  inputType: EngineInputType.text,
-);
+final InputConfiguration singlelineConfig = InputConfiguration();
 
 final InputConfiguration multilineConfig = InputConfiguration(
   inputType: EngineInputType.multiline,
@@ -34,6 +30,8 @@ void main() {
 }
 
 void testMain() {
+  ensureFlutterViewEmbedderInitialized();
+
   setUp(() {
     EngineSemanticsOwner.debugResetSemantics();
   });
@@ -75,7 +73,7 @@ void testMain() {
 
     createTextFieldSemantics(value: 'hello');
 
-    final html.Element textField = appHostNode
+    final DomElement textField = appHostNode
         .querySelector('input[data-semantics-role="text-field"]')!;
 
     expect(appHostNode.activeElement, isNot(textField));
@@ -97,14 +95,14 @@ void testMain() {
         ..debugOverrideTimestampFunction(() => _testTime)
         ..semanticsEnabled = true;
 
-      expect(html.document.activeElement, html.document.body);
+      expect(domDocument.activeElement, domDocument.body);
       expect(appHostNode.activeElement, null);
 
       int changeCount = 0;
       int actionCount = 0;
       strategy.enable(
         singlelineConfig,
-        onChange: (_) {
+        onChange: (_, __) {
           changeCount++;
         },
         onAction: (_) {
@@ -121,7 +119,7 @@ void testMain() {
       );
 
       final TextField textField = textFieldSemantics.debugRoleManagerFor(Role.textField)! as TextField;
-      expect(html.document.activeElement, domRenderer.glassPaneElement);
+      expect(domDocument.activeElement, flutterViewEmbedder.glassPaneElement);
       expect(appHostNode.activeElement, strategy.domElement);
       expect(textField.editableElement, strategy.domElement);
       expect((textField.editableElement as dynamic).value, 'hello');
@@ -133,11 +131,10 @@ void testMain() {
       createTextFieldSemantics(
         value: 'bye',
         label: 'farewell',
-        isFocused: false,
         rect: const ui.Rect.fromLTWH(0, 0, 12, 17),
       );
 
-      expect(html.document.activeElement, html.document.body);
+      expect(domDocument.activeElement, domDocument.body);
       expect(appHostNode.activeElement, null);
       expect(strategy.domElement, null);
       expect((textField.editableElement as dynamic).value, 'bye');
@@ -159,12 +156,12 @@ void testMain() {
         ..debugOverrideTimestampFunction(() => _testTime)
         ..semanticsEnabled = true;
 
-      expect(html.document.activeElement, html.document.body);
+      expect(domDocument.activeElement, domDocument.body);
       expect(appHostNode.activeElement, null);
 
       strategy.enable(
         singlelineConfig,
-        onChange: (_) {},
+        onChange: (_, __) {},
         onAction: (_) {},
       );
       final SemanticsObject textFieldSemantics = createTextFieldSemantics(
@@ -174,12 +171,12 @@ void testMain() {
 
       final TextField textField = textFieldSemantics.debugRoleManagerFor(Role.textField)! as TextField;
       expect(textField.editableElement, strategy.domElement);
-      expect(html.document.activeElement, domRenderer.glassPaneElement);
+      expect(domDocument.activeElement, flutterViewEmbedder.glassPaneElement);
       expect(appHostNode.activeElement, strategy.domElement);
 
       // The input should not refocus after blur.
       textField.editableElement.blur();
-      expect(html.document.activeElement, html.document.body);
+      expect(domDocument.activeElement, domDocument.body);
       expect(appHostNode.activeElement, null);
       strategy.disable();
       semantics().semanticsEnabled = false;
@@ -192,7 +189,7 @@ void testMain() {
 
       strategy.enable(
         singlelineConfig,
-        onChange: (_) {},
+        onChange: (_, __) {},
         onAction: (_) {},
       );
 
@@ -205,7 +202,7 @@ void testMain() {
         isFocused: true,
       );
       expect(strategy.domElement, isNotNull);
-      expect(html.document.activeElement, domRenderer.glassPaneElement);
+      expect(domDocument.activeElement, flutterViewEmbedder.glassPaneElement);
       expect(appHostNode.activeElement, strategy.domElement);
 
       strategy.disable();
@@ -216,7 +213,7 @@ void testMain() {
       expect(appHostNode.contains(textField.editableElement), isTrue);
       // Editing element is not enabled.
       expect(strategy.isEnabled, isFalse);
-      expect(html.document.activeElement, html.document.body);
+      expect(domDocument.activeElement, domDocument.body);
       expect(appHostNode.activeElement, null);
       semantics().semanticsEnabled = false;
     });
@@ -228,7 +225,7 @@ void testMain() {
 
       strategy.enable(
         singlelineConfig,
-        onChange: (_) {},
+        onChange: (_, __) {},
         onAction: (_) {},
       );
 
@@ -237,12 +234,12 @@ void testMain() {
         isFocused: true,
       );
       expect(strategy.domElement, isNotNull);
-      expect(html.document.activeElement, domRenderer.glassPaneElement);
+      expect(domDocument.activeElement, flutterViewEmbedder.glassPaneElement);
       expect(appHostNode.activeElement, strategy.domElement);
 
       // Blur the element without telling the framework.
       strategy.activeDomElement.blur();
-      expect(html.document.activeElement, html.document.body);
+      expect(domDocument.activeElement, domDocument.body);
       expect(appHostNode.activeElement, null);
 
       // The input will have focus after editing state is set and semantics updated.
@@ -261,7 +258,7 @@ void testMain() {
         value: 'hello',
         isFocused: true,
       );
-      expect(html.document.activeElement, domRenderer.glassPaneElement);
+      expect(domDocument.activeElement, flutterViewEmbedder.glassPaneElement);
       expect(appHostNode.activeElement, strategy.domElement);
 
       strategy.disable();
@@ -275,7 +272,7 @@ void testMain() {
 
       strategy.enable(
         multilineConfig,
-        onChange: (_) {},
+        onChange: (_, __) {},
         onAction: (_) {},
       );
       createTextFieldSemantics(
@@ -284,19 +281,19 @@ void testMain() {
         isMultiline: true,
       );
 
-      final html.TextAreaElement textArea = strategy.domElement! as html.TextAreaElement;
+      final DomHTMLTextAreaElement textArea = strategy.domElement! as DomHTMLTextAreaElement;
 
-      expect(html.document.activeElement, domRenderer.glassPaneElement);
+      expect(domDocument.activeElement, flutterViewEmbedder.glassPaneElement);
       expect(appHostNode.activeElement, strategy.domElement);
 
       strategy.enable(
         singlelineConfig,
-        onChange: (_) {},
+        onChange: (_, __) {},
         onAction: (_) {},
       );
 
       textArea.blur();
-      expect(html.document.activeElement, html.document.body);
+      expect(domDocument.activeElement, domDocument.body);
       expect(appHostNode.activeElement, null);
 
       strategy.disable();
@@ -314,7 +311,7 @@ void testMain() {
 
       strategy.enable(
         singlelineConfig,
-        onChange: (_) {},
+        onChange: (_, __) {},
         onAction: (_) {},
       );
 
@@ -335,7 +332,6 @@ void testMain() {
       createTextFieldSemantics(
         value: 'hello',
         isFocused: true,
-        rect: semanticsRect,
       );
 
       // Checks that the placement attributes come from semantics and not from
@@ -382,7 +378,7 @@ void testMain() {
 
       strategy.enable(
         singlelineConfig,
-        onChange: (_) {},
+        onChange: (_, __) {},
         onAction: (_) {},
       );
 
@@ -392,7 +388,7 @@ void testMain() {
         createTwoFieldSemantics(tester, focusFieldId: 1);
         expect(tester.apply().length, 3);
 
-        expect(html.document.activeElement, domRenderer.glassPaneElement);
+        expect(domDocument.activeElement, flutterViewEmbedder.glassPaneElement);
         expect(appHostNode.activeElement, tester.getTextField(1).editableElement);
         expect(strategy.domElement, tester.getTextField(1).editableElement);
 

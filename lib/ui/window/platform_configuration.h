@@ -11,19 +11,19 @@
 #include <unordered_map>
 #include <vector>
 
+#include "flutter/assets/asset_manager.h"
 #include "flutter/fml/time/time_point.h"
 #include "flutter/lib/ui/semantics/semantics_update.h"
 #include "flutter/lib/ui/window/pointer_data_packet.h"
 #include "flutter/lib/ui/window/viewport_metrics.h"
 #include "flutter/lib/ui/window/window.h"
 #include "third_party/tonic/dart_persistent_value.h"
+#include "third_party/tonic/typed_data/dart_byte_data.h"
 
 namespace flutter {
 class FontCollection;
 class PlatformMessage;
 class Scene;
-
-typedef std::function<void(bool /* handled */)> KeyDataResponse;
 
 //--------------------------------------------------------------------------
 /// @brief An enum for defining the different kinds of accessibility features
@@ -37,6 +37,7 @@ enum class AccessibilityFeatureFlag : int32_t {
   kBoldText = 1 << 3,
   kReduceMotion = 1 << 4,
   kHighContrast = 1 << 5,
+  kOnOffSwitchLabels = 1 << 6,
 };
 
 //--------------------------------------------------------------------------
@@ -98,6 +99,11 @@ class PlatformConfigurationClient {
   ///             collections of them. MinikinFontForTest is used for FontFamily
   ///             creation.
   virtual FontCollection& GetFontCollection() = 0;
+
+  //--------------------------------------------------------------------------
+  /// @brief      Returns the current collection of assets available on the
+  ///             platform.
+  virtual std::shared_ptr<AssetManager> GetAssetManager() = 0;
 
   //--------------------------------------------------------------------------
   /// @brief      Notifies this client of the name of the root isolate and its
@@ -328,24 +334,6 @@ class PlatformConfiguration final {
                                fml::MallocMapping args);
 
   //----------------------------------------------------------------------------
-  /// @brief      Registers a callback to be invoked when the framework has
-  ///             decided whether to handle an event. This callback originates
-  ///             in the platform view and has been forwarded through the engine
-  ///             to here.
-  ///
-  ///             This method will move and store the `callback`, associate it
-  ///             with a self-incrementing identifier, the response ID, then
-  ///             return the ID, which is typically used by
-  ///             Window::DispatchKeyDataPacket.
-  ///
-  /// @param[in]  callback  The callback to be registered.
-  ///
-  /// @return     The response ID to be associated with the callback. Using this
-  ///             ID in CompleteKeyDataResponse will invoke the callback.
-  ///
-  uint64_t RegisterKeyDataResponse(KeyDataResponse callback);
-
-  //----------------------------------------------------------------------------
   /// @brief      Notifies the framework that it is time to begin working on a
   ///             new frame previously scheduled via a call to
   ///             `PlatformConfigurationClient::ScheduleFrame`. This call
@@ -401,15 +389,6 @@ class PlatformConfiguration final {
   void ReportTimings(std::vector<int64_t> timings);
 
   //----------------------------------------------------------------------------
-  /// @brief      Registers the native handlers for Dart functions that this
-  ///             class handles.
-  ///
-  /// @param[in] natives The natives registry that the functions will be
-  ///                    registered with.
-  ///
-  static void RegisterNatives(tonic::DartLibraryNatives* natives);
-
-  //----------------------------------------------------------------------------
   /// @brief      Retrieves the Window with the given ID managed by the
   ///             `PlatformConfiguration`.
   ///
@@ -439,30 +418,17 @@ class PlatformConfiguration final {
   ///
   void CompletePlatformMessageEmptyResponse(int response_id);
 
-  //----------------------------------------------------------------------------
-  /// @brief      Responds to a previously registered key data message from the
-  ///             framework to the engine.
-  ///
-  ///             For each response_id, this method should be called exactly
-  ///             once. Responding to a response_id that has not been registered
-  ///             or has been invoked will lead to a fatal error.
-  ///
-  /// @param[in] response_id The unique id that identifies the original platform
-  ///                        message to respond to, created by
-  ///                        RegisterKeyDataResponse.
-  /// @param[in] handled     Whether the key data is handled.
-  ///
-  void CompleteKeyDataResponse(uint64_t response_id, bool handled);
+  Dart_Handle on_error() { return on_error_.Get(); }
 
  private:
   PlatformConfigurationClient* client_;
+  tonic::DartPersistentValue on_error_;
   tonic::DartPersistentValue update_locales_;
   tonic::DartPersistentValue update_user_settings_data_;
   tonic::DartPersistentValue update_lifecycle_state_;
   tonic::DartPersistentValue update_semantics_enabled_;
   tonic::DartPersistentValue update_accessibility_features_;
   tonic::DartPersistentValue dispatch_platform_message_;
-  tonic::DartPersistentValue dispatch_key_message_;
   tonic::DartPersistentValue dispatch_semantics_action_;
   tonic::DartPersistentValue begin_frame_;
   tonic::DartPersistentValue draw_frame_;
@@ -474,10 +440,43 @@ class PlatformConfiguration final {
   int next_response_id_ = 1;
   std::unordered_map<int, fml::RefPtr<PlatformMessageResponse>>
       pending_responses_;
+};
 
-  // ID starts at 1 because an ID of 0 indicates that no response is expected.
-  uint64_t next_key_response_id_ = 1;
-  std::unordered_map<uint64_t, KeyDataResponse> pending_key_responses_;
+//----------------------------------------------------------------------------
+// API exposed as FFI calls in Dart.
+//
+// These are probably not supposed to be called directly, and should instead
+// be called through their sibling API in `PlatformConfiguration` or
+// `PlatformConfigurationClient`.
+//
+// These are intentionally undocumented. Refer instead to the sibling methods
+// above.
+//----------------------------------------------------------------------------
+class PlatformConfigurationNativeApi {
+ public:
+  static std::string DefaultRouteName();
+
+  static void ScheduleFrame();
+
+  static void Render(Scene* scene);
+
+  static void UpdateSemantics(SemanticsUpdate* update);
+
+  static void SetNeedsReportTimings(bool value);
+
+  static Dart_Handle GetPersistentIsolateData();
+
+  static Dart_Handle ComputePlatformResolvedLocale(
+      Dart_Handle supportedLocalesHandle);
+
+  static void SetIsolateDebugName(const std::string name);
+
+  static Dart_Handle SendPlatformMessage(const std::string& name,
+                                         Dart_Handle callback,
+                                         Dart_Handle data_handle);
+
+  static void RespondToPlatformMessage(int response_id,
+                                       const tonic::DartByteData& data);
 };
 
 }  // namespace flutter

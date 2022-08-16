@@ -11,7 +11,6 @@ import 'package:archive/archive_io.dart';
 import 'package:http/http.dart';
 import 'package:path/path.dart' as path;
 
-import 'browser_lock.dart';
 import 'common.dart';
 import 'environment.dart';
 import 'exceptions.dart';
@@ -101,16 +100,16 @@ class ChromeInstaller {
     );
   }
 
-  static Future<ChromeInstaller> latest() async {
-    final String latestVersion = await fetchLatestChromeVersion();
-    return ChromeInstaller(version: latestVersion);
-  }
-
   ChromeInstaller._({
     required this.version,
     required this.chromeInstallationDir,
     required this.versionDir,
   });
+
+  static Future<ChromeInstaller> latest() async {
+    final String latestVersion = await fetchLatestChromeVersion();
+    return ChromeInstaller(version: latestVersion);
+  }
 
   /// Chrome version managed by this installer.
   final String version;
@@ -140,25 +139,21 @@ class ChromeInstaller {
   }
 
   Future<void> install() async {
-    if (versionDir.existsSync() && !isLuci) {
-      versionDir.deleteSync(recursive: true);
-      versionDir.createSync(recursive: true);
-    } else if (versionDir.existsSync() && isLuci) {
-      print('INFO: Chrome version directory in LUCI: '
-          '${versionDir.path}');
-    } else if (!versionDir.existsSync() && isLuci) {
-      // Chrome should have been deployed as a CIPD package on LUCI.
-      // Throw if it does not exists.
-      throw StateError('Failed to locate Chrome on LUCI on path:'
-          '${versionDir.path}');
-    } else {
-      // If the directory does not exists and felt is not running on LUCI.
-      versionDir.createSync(recursive: true);
+    if (isLuci) {
+      throw StateError(
+        'Rejecting attempt to install Chromium on LUCI. LUCI is expected to '
+        'provide Chromium as a CIPD dependency managed using .ci.yaml.',
+      );
     }
 
-    print('INFO: Starting Chrome download.');
+    if (versionDir.existsSync()) {
+      versionDir.deleteSync(recursive: true);
+    }
+    versionDir.createSync(recursive: true);
 
     final String url = PlatformBinding.instance.getChromeDownloadUrl(version);
+    print('Downloading Chrome from $url');
+
     final StreamedResponse download = await client.send(Request(
       'GET',
       Uri.parse(url),
@@ -188,18 +183,21 @@ class ChromeInstaller {
         final String filename = file.name;
         if (file.isFile) {
           final List<int> data = file.content as List<int>;
-          io.File(path.join(versionDir.path, filename))
+          io.File(path.joinAll(<String>[
+            versionDir.path,
+            // Remove the "chrome-win/" path prefix, which is the Windows
+            // convention for Chromium directory structure.
+            ...path.split(filename).skip(1),
+          ]))
             ..createSync(recursive: true)
             ..writeAsBytesSync(data);
-        } else {
-          io.Directory(path.join(versionDir.path, filename))
-              .create(recursive: true);
         }
       }
 
       stopwatch.stop();
       print(
-          'INFO: The unzip took ${stopwatch.elapsedMilliseconds ~/ 1000} seconds.');
+        'The unzip took ${stopwatch.elapsedMilliseconds ~/ 1000} seconds.'
+      );
     } else {
       // We have to unzip into a temporary directory and then copy the files
       // out because our tests expect the files to be direct children of the
@@ -220,8 +218,9 @@ class ChromeInstaller {
             'With the version path ${versionDir.path}\n'
             'The unzip process exited with code ${unzipResult.exitCode}.');
       }
-      // For Linux, we need to copy over the files out of the chrome-linux
-      // sub directory.
+
+      // Remove the "chrome-linux/" path prefix, which is the Linux
+      // convention for Chromium directory structure.
       if (io.Platform.isLinux) {
         final io.Directory chromeLinuxDir =
             await tmpDir.list().single as io.Directory;
@@ -254,26 +253,5 @@ Future<String> fetchLatestChromeVersion() async {
     return response.body;
   } finally {
     client.close();
-  }
-}
-
-/// Make sure LUCI bot has the pinned Chrome version and return the executable.
-///
-/// We are using CIPD packages in LUCI. The pinned chrome version from the
-/// `browser_lock.yaml` file will already be installed in the LUCI bot.
-/// Verify if Chrome is installed and use it for the integration tests.
-String preinstalledChromeExecutable() {
-  // Note that build number and major version is different for Chrome.
-  // For example for a build number `753189`, major version is 83.
-  final String buildNumber = browserLock.chromeLock.versionForCurrentPlatform;
-  final ChromeInstaller chromeInstaller = ChromeInstaller(version: buildNumber);
-  if (chromeInstaller.isInstalled) {
-    final String executable = chromeInstaller.getInstallation()!.executable;
-    print('INFO: Found chrome executable for LUCI: $executable');
-    return executable;
-  } else {
-    throw StateError(
-      'Failed to locate pinned Chrome build: $buildNumber on LUCI.',
-    );
   }
 }

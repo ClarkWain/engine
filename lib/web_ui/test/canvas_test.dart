@@ -14,10 +14,8 @@ void main() {
   internalBootstrapBrowserTest(() => testMain);
 }
 
-void testMain() {
-  setUpAll(() {
-    WebExperiments.ensureInitialized();
-  });
+Future<void> testMain() async {
+  await initializeEngine();
 
   group('EngineCanvas', () {
     late MockEngineCanvas mockCanvas;
@@ -31,7 +29,7 @@ void testMain() {
     }) {
       test(description, () {
         testFn(BitmapCanvas(canvasSize, RenderStrategy()));
-        testFn(DomCanvas(domRenderer.createElement('flt-picture')));
+        testFn(DomCanvas(domDocument.createElement('flt-picture')));
         testFn(mockCanvas = MockEngineCanvas());
         whenDone?.call();
       });
@@ -57,8 +55,9 @@ void testMain() {
 
       call = mockCanvas.methodCallLog[1];
       expect(call.methodName, 'drawParagraph');
-      expect(call.arguments['paragraph'], paragraph);
-      expect(call.arguments['offset'], const ui.Offset(10, 10));
+      final Map<dynamic, dynamic> arguments = call.arguments as Map<dynamic, dynamic>;
+      expect(arguments['paragraph'], paragraph);
+      expect(arguments['offset'], const ui.Offset(10, 10));
     });
 
     testCanvas('ignores paragraphs that were not laid out',

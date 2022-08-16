@@ -8,7 +8,6 @@ import 'package:args/command_runner.dart';
 
 import 'build.dart';
 import 'clean.dart';
-import 'create_simulator.dart';
 import 'exceptions.dart';
 import 'licenses.dart';
 import 'run.dart';
@@ -21,7 +20,6 @@ CommandRunner<bool> runner = CommandRunner<bool>(
 )
   ..addCommand(BuildCommand())
   ..addCommand(CleanCommand())
-  ..addCommand(CreateSimulatorCommand())
   ..addCommand(LicensesCommand())
   ..addCommand(RunCommand())
   ..addCommand(TestCommand());
@@ -71,7 +69,7 @@ Future<void> main(List<String> rawArgs) async {
   io.exit(io.exitCode);
 }
 
-Future<void> _listenToShutdownSignals() async {
+void _listenToShutdownSignals() {
   io.ProcessSignal.sigint.watch().listen((_) async {
     print('Received SIGINT. Shutting down.');
     await cleanup();

@@ -37,6 +37,11 @@ const std::string_view ServiceProtocol::kGetSkSLsExtensionName =
 const std::string_view
     ServiceProtocol::kEstimateRasterCacheMemoryExtensionName =
         "_flutter.estimateRasterCacheMemory";
+const std::string_view
+    ServiceProtocol::kRenderFrameWithRasterStatsExtensionName =
+        "_flutter.renderFrameWithRasterStats";
+const std::string_view ServiceProtocol::kReloadAssetFonts =
+    "_flutter.reloadAssetFonts";
 
 static constexpr std::string_view kViewIdPrefx = "_flutterView/";
 static constexpr std::string_view kListViewsExtensionName =
@@ -56,6 +61,8 @@ ServiceProtocol::ServiceProtocol()
           kGetDisplayRefreshRateExtensionName,
           kGetSkSLsExtensionName,
           kEstimateRasterCacheMemoryExtensionName,
+          kRenderFrameWithRasterStatsExtensionName,
+          kReloadAssetFonts,
       }),
       handlers_mutex_(fml::SharedMutex::Create()) {}
 
@@ -189,7 +196,7 @@ bool ServiceProtocol::HandleMessage(std::string_view method,
 
   fml::SharedLock lock(*handlers_mutex_);
 
-  if (handlers_.size() == 0) {
+  if (handlers_.empty()) {
     WriteServerErrorResponse(response,
                              "There are no running service protocol handlers.");
     return false;

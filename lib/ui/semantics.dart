@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-
-// @dart = 2.12
 part of dart.ui;
 
 /// The possible actions that can be conveyed from the operating system
@@ -34,11 +32,11 @@ class SemanticsAction {
   static const int _kPasteIndex = 1 << 14;
   static const int _kDidGainAccessibilityFocusIndex = 1 << 15;
   static const int _kDidLoseAccessibilityFocusIndex = 1 << 16;
-  static const int _kCustomAction = 1 << 17;
+  static const int _kCustomActionIndex = 1 << 17;
   static const int _kDismissIndex = 1 << 18;
   static const int _kMoveCursorForwardByWordIndex = 1 << 19;
   static const int _kMoveCursorBackwardByWordIndex = 1 << 20;
-  static const int _kSetText = 1 << 21;
+  static const int _kSetTextIndex = 1 << 21;
   // READ THIS: if you add an action here, you MUST update the
   // numSemanticsActions value in testing/dart/semantics_test.dart, or tests
   // will fail.
@@ -122,7 +120,7 @@ class SemanticsAction {
   ///
   /// The action includes a string argument, which is the new text to
   /// replace.
-  static const SemanticsAction setText = SemanticsAction._(_kSetText);
+  static const SemanticsAction setText = SemanticsAction._(_kSetTextIndex);
 
   /// Set the text selection to the given range.
   ///
@@ -174,7 +172,7 @@ class SemanticsAction {
   ///
   /// This handler is added automatically whenever a custom accessibility
   /// action is added to a semantics node.
-  static const SemanticsAction customAction = SemanticsAction._(_kCustomAction);
+  static const SemanticsAction customAction = SemanticsAction._(_kCustomActionIndex);
 
   /// A request that the node should be dismissed.
   ///
@@ -223,11 +221,11 @@ class SemanticsAction {
     _kPasteIndex: paste,
     _kDidGainAccessibilityFocusIndex: didGainAccessibilityFocus,
     _kDidLoseAccessibilityFocusIndex: didLoseAccessibilityFocus,
-    _kCustomAction: customAction,
+    _kCustomActionIndex: customAction,
     _kDismissIndex: dismiss,
     _kMoveCursorForwardByWordIndex: moveCursorForwardByWord,
     _kMoveCursorBackwardByWordIndex: moveCursorBackwardByWord,
-    _kSetText: setText,
+    _kSetTextIndex: setText,
   };
 
   @override
@@ -267,7 +265,7 @@ class SemanticsAction {
         return 'SemanticsAction.didGainAccessibilityFocus';
       case _kDidLoseAccessibilityFocusIndex:
         return 'SemanticsAction.didLoseAccessibilityFocus';
-      case _kCustomAction:
+      case _kCustomActionIndex:
         return 'SemanticsAction.customAction';
       case _kDismissIndex:
         return 'SemanticsAction.dismiss';
@@ -275,10 +273,10 @@ class SemanticsAction {
         return 'SemanticsAction.moveCursorForwardByWord';
       case _kMoveCursorBackwardByWordIndex:
         return 'SemanticsAction.moveCursorBackwardByWord';
-      case _kSetText:
+      case _kSetTextIndex:
         return 'SemanticsAction.setText';
     }
-    assert(false, 'Unhandled index: $index');
+    assert(false, 'Unhandled index: $index (0x${index.toRadixString(8).padLeft(4, "0")})');
     return '';
   }
 }
@@ -289,6 +287,13 @@ class SemanticsAction {
 // `lib/ui/semantics/semantics_node.h` and in each of the embedders *must* be
 // updated.
 class SemanticsFlag {
+  const SemanticsFlag._(this.index) : assert(index != null);
+
+  /// The numerical value for this flag.
+  ///
+  /// Each flag has one bit set in this bit field.
+  final int index;
+
   static const int _kHasCheckedStateIndex = 1 << 0;
   static const int _kIsCheckedIndex = 1 << 1;
   static const int _kIsSelectedIndex = 1 << 2;
@@ -300,7 +305,7 @@ class SemanticsFlag {
   static const int _kIsInMutuallyExclusiveGroupIndex = 1 << 8;
   static const int _kIsHeaderIndex = 1 << 9;
   static const int _kIsObscuredIndex = 1 << 10;
-  static const int _kScopesRouteIndex= 1 << 11;
+  static const int _kScopesRouteIndex = 1 << 11;
   static const int _kNamesRouteIndex = 1 << 12;
   static const int _kIsHiddenIndex = 1 << 13;
   static const int _kIsImageIndex = 1 << 14;
@@ -318,14 +323,7 @@ class SemanticsFlag {
   // value in testing/dart/semantics_test.dart, or tests will fail. Also,
   // please update the Flag enum in
   // flutter/shell/platform/android/io/flutter/view/AccessibilityBridge.java,
-  // and the SemanticsFlag class in lib/web_ui/lib/src/ui/semantics.dart.
-
-  const SemanticsFlag._(this.index) : assert(index != null);
-
-  /// The numerical value for this flag.
-  ///
-  /// Each flag has one bit set in this bit field.
-  final int index;
+  // and the SemanticsFlag class in lib/web_ui/lib/semantics.dart.
 
   /// The semantics node has the quality of either being "checked" or "unchecked".
   ///
@@ -580,7 +578,7 @@ class SemanticsFlag {
     _kIsLinkIndex: isLink,
     _kIsSliderIndex: isSlider,
     _kIsKeyboardKeyIndex: isKeyboardKey,
-};
+  };
 
   @override
   String toString() {
@@ -636,16 +634,18 @@ class SemanticsFlag {
       case _kIsKeyboardKeyIndex:
         return 'SemanticsFlag.isKeyboardKey';
     }
-    assert(false, 'Unhandled index: $index');
+    assert(false, 'Unhandled index: $index (0x${index.toRadixString(8).padLeft(4, "0")})');
     return '';
   }
 }
 
 // When adding a new StringAttribute, the classes in these files must be
 // updated as well.
-//  * engine/src/flutter/lib/web_ui/lib/src/ui/semantics.dart
+//  * engine/src/flutter/lib/web_ui/lib/semantics.dart
 //  * engine/src/flutter/lib/ui/semantics/string_attribute.h
 //  * engine/src/flutter/shell/platform/android/io/flutter/view/AccessibilityBridge.java
+//  * engine/src/flutter/lib/web_ui/test/engine/semantics/semantics_api_test.dart
+//  * engine/src/flutter/testing/dart/semantics_test.dart
 
 /// An abstract interface for string attributes that affects how assistive
 /// technologies, e.g. VoiceOver or TalkBack, treat the text.
@@ -692,11 +692,8 @@ class SpellOutStringAttribute extends StringAttribute {
     _initSpellOutStringAttribute(this, range.start, range.end);
   }
 
-  void _initSpellOutStringAttribute(
-    SpellOutStringAttribute instance,
-    int start,
-    int end,
-  ) native 'NativeStringAttribute_initSpellOutStringAttribute';
+  @FfiNative<Void Function(Handle, Int32, Int32)>('NativeStringAttribute::initSpellOutStringAttribute')
+  external static void _initSpellOutStringAttribute(SpellOutStringAttribute instance, int start, int end);
 
   @override
   StringAttribute copy({required TextRange range}) {
@@ -731,12 +728,8 @@ class LocaleStringAttribute extends StringAttribute {
   /// The lanuage of this attribute.
   final Locale locale;
 
-  void _initLocaleStringAttribute(
-    LocaleStringAttribute instance,
-    int start,
-    int end,
-    String locale,
-  ) native 'NativeStringAttribute_initLocaleStringAttribute';
+  @FfiNative<Void Function(Handle, Int32, Int32, Handle)>('NativeStringAttribute::initLocaleStringAttribute')
+  external static void _initLocaleStringAttribute(LocaleStringAttribute instance, int start, int end, String locale);
 
   @override
   StringAttribute copy({required TextRange range}) {
@@ -759,7 +752,9 @@ class SemanticsUpdateBuilder extends NativeFieldWrapperClass1 {
   /// Creates an empty [SemanticsUpdateBuilder] object.
   @pragma('vm:entry-point')
   SemanticsUpdateBuilder() { _constructor(); }
-  void _constructor() native 'SemanticsUpdateBuilder_constructor';
+
+  @FfiNative<Void Function(Handle)>('SemanticsUpdateBuilder::Create')
+  external void _constructor();
 
   /// Update the information associated with the node with the given `id`.
   ///
@@ -911,7 +906,7 @@ class SemanticsUpdateBuilder extends NativeFieldWrapperClass1 {
       decreasedValueAttributes,
       hint,
       hintAttributes,
-      tooltip,
+      tooltip ?? '',
       textDirection != null ? textDirection.index + 1 : 0,
       transform,
       childrenInTraversalOrder,
@@ -919,43 +914,80 @@ class SemanticsUpdateBuilder extends NativeFieldWrapperClass1 {
       additionalActions,
     );
   }
-  void _updateNode(
-    int id,
-    int flags,
-    int actions,
-    int maxValueLength,
-    int currentValueLength,
-    int textSelectionBase,
-    int textSelectionExtent,
-    int platformViewId,
-    int scrollChildren,
-    int scrollIndex,
-    double scrollPosition,
-    double scrollExtentMax,
-    double scrollExtentMin,
-    double left,
-    double top,
-    double right,
-    double bottom,
-    double elevation,
-    double thickness,
-    String label,
-    List<StringAttribute> labelAttributes,
-    String value,
-    List<StringAttribute> valueAttributes,
-    String increasedValue,
-    List<StringAttribute> increasedValueAttributes,
-    String decreasedValue,
-    List<StringAttribute> decreasedValueAttributes,
-    String hint,
-    List<StringAttribute> hintAttributes,
-    String? tooltip,
-    int textDirection,
-    Float64List transform,
-    Int32List childrenInTraversalOrder,
-    Int32List childrenInHitTestOrder,
-    Int32List additionalActions,
-  ) native 'SemanticsUpdateBuilder_updateNode';
+  @FfiNative<
+      Void Function(
+          Pointer<Void>,
+          Int32,
+          Int32,
+          Int32,
+          Int32,
+          Int32,
+          Int32,
+          Int32,
+          Int32,
+          Int32,
+          Int32,
+          Double,
+          Double,
+          Double,
+          Double,
+          Double,
+          Double,
+          Double,
+          Double,
+          Double,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Int32,
+          Handle,
+          Handle,
+          Handle,
+          Handle)>('SemanticsUpdateBuilder::updateNode')
+  external void _updateNode(
+      int id,
+      int flags,
+      int actions,
+      int maxValueLength,
+      int currentValueLength,
+      int textSelectionBase,
+      int textSelectionExtent,
+      int platformViewId,
+      int scrollChildren,
+      int scrollIndex,
+      double scrollPosition,
+      double scrollExtentMax,
+      double scrollExtentMin,
+      double left,
+      double top,
+      double right,
+      double bottom,
+      double elevation,
+      double thickness,
+      String label,
+      List<StringAttribute> labelAttributes,
+      String value,
+      List<StringAttribute> valueAttributes,
+      String increasedValue,
+      List<StringAttribute> increasedValueAttributes,
+      String decreasedValue,
+      List<StringAttribute> decreasedValueAttributes,
+      String hint,
+      List<StringAttribute> hintAttributes,
+      String tooltip,
+      int textDirection,
+      Float64List transform,
+      Int32List childrenInTraversalOrder,
+      Int32List childrenInHitTestOrder,
+      Int32List additionalActions);
 
   /// Update the custom semantics action associated with the given `id`.
   ///
@@ -975,13 +1007,10 @@ class SemanticsUpdateBuilder extends NativeFieldWrapperClass1 {
   void updateCustomAction({required int id, String? label, String? hint, int overrideId = -1}) {
     assert(id != null);
     assert(overrideId != null);
-    _updateCustomAction(id, label, hint, overrideId);
+    _updateCustomAction(id, label ?? '', hint ?? '', overrideId);
   }
-  void _updateCustomAction(
-      int id,
-      String? label,
-      String? hint,
-      int overrideId) native 'SemanticsUpdateBuilder_updateCustomAction';
+  @FfiNative<Void Function(Pointer<Void>, Int32, Handle, Handle, Int32)>('SemanticsUpdateBuilder::updateCustomAction')
+  external void _updateCustomAction(int id, String label, String hint, int overrideId);
 
   /// Creates a [SemanticsUpdate] object that encapsulates the updates recorded
   /// by this object.
@@ -993,7 +1022,8 @@ class SemanticsUpdateBuilder extends NativeFieldWrapperClass1 {
     _build(semanticsUpdate);
     return semanticsUpdate;
   }
-  void _build(SemanticsUpdate outSemanticsUpdate) native 'SemanticsUpdateBuilder_build';
+  @FfiNative<Void Function(Pointer<Void>, Handle)>('SemanticsUpdateBuilder::build')
+  external void _build(SemanticsUpdate outSemanticsUpdate);
 }
 
 /// An opaque object representing a batch of semantics updates.
@@ -1015,5 +1045,9 @@ class SemanticsUpdate extends NativeFieldWrapperClass1 {
   ///
   /// After calling this function, the semantics update is cannot be used
   /// further.
-  void dispose() native 'SemanticsUpdate_dispose';
+  ///
+  /// This can't be a leaf call because the native function calls Dart API
+  /// (Dart_SetNativeInstanceField).
+  @FfiNative<Void Function(Pointer<Void>)>('SemanticsUpdate::dispose')
+  external void dispose();
 }

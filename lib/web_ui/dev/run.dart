@@ -26,8 +26,12 @@ class RunCommand extends Command<bool> with ArgUtils<bool> {
     argParser.addFlag(
       'list',
       abbr: 'l',
-      defaultsTo: false,
       help: 'Lists all available build steps.',
+    );
+    argParser.addFlag(
+      'require-skia-gold',
+      help: 'Whether we require Skia Gold to be available or not. When this '
+            'flag is true, the tests will fail if Skia Gold is not available.',
     );
   }
 
@@ -35,6 +39,10 @@ class RunCommand extends Command<bool> with ArgUtils<bool> {
   String get name => 'run';
 
   bool get isListSteps => boolArg('list');
+
+  /// When running screenshot tests, require Skia Gold to be available and
+  /// reachable.
+  bool get requireSkiaGold => boolArg('require-skia-gold');
 
   @override
   String get description => 'Runs a build step.';
@@ -49,9 +57,11 @@ class RunCommand extends Command<bool> with ArgUtils<bool> {
       'compile_tests': CompileTestsStep(),
       for (final String browserName in kAllBrowserNames)
         'run_tests_$browserName': RunTestsStep(
-          browserEnvironment: getBrowserEnvironment(browserName),
+          browserName: browserName,
           isDebug: false,
           doUpdateScreenshotGoldens: false,
+          requireSkiaGold: requireSkiaGold,
+          overridePathToCanvasKit: null,
         ),
     };
 

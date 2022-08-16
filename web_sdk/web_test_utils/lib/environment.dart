@@ -36,6 +36,16 @@ class Environment {
     return _prepareEnvironmentFromEngineDir(script, directory);
   }
 
+  Environment._({
+    required this.self,
+    required this.webUiRootDir,
+    required this.engineSrcDir,
+    required this.engineToolsDir,
+    required this.outDir,
+    required this.hostDebugUnoptDir,
+    required this.dartSdkDir,
+  });
+
   static Environment _prepareEnvironmentFromEngineDir(
       io.File self, io.Directory engineSrcDir) {
     final io.Directory engineToolsDir =
@@ -72,16 +82,6 @@ class Environment {
     );
   }
 
-  Environment._({
-    required this.self,
-    required this.webUiRootDir,
-    required this.engineSrcDir,
-    required this.engineToolsDir,
-    required this.outDir,
-    required this.hostDebugUnoptDir,
-    required this.dartSdkDir,
-  });
-
   /// The Dart script that's currently running.
   final io.File self;
 
@@ -110,10 +110,6 @@ class Environment {
 
   /// The "pub" executable file.
   String get pubExecutable => pathlib.join(dartSdkDir.path, 'bin', 'pub');
-
-  /// The "dart2js" executable file.
-  String get dart2jsExecutable =>
-      pathlib.join(dartSdkDir.path, 'bin', 'dart2js');
 
   /// Path to where github.com/flutter/engine is checked out inside the engine workspace.
   io.Directory get flutterDirectory =>
@@ -174,10 +170,10 @@ class Environment {
         'lib',
       ));
 
-  /// Path to the clone of the flutter/goldens repository.
-  io.Directory get webUiGoldensRepositoryDirectory => io.Directory(pathlib.join(
+  /// Path to the base directory to be used by Skia Gold.
+  io.Directory get webUiSkiaGoldDirectory => io.Directory(pathlib.join(
         webUiDartToolDir.path,
-        'goldens',
+        'skia_gold',
       ));
 
   /// Directory to add test results which would later be uploaded to a gcs

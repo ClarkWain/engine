@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:html' as html;
 import 'dart:js_util' as js_util;
 import 'dart:math' as math;
 
@@ -31,7 +30,7 @@ Future<void> testMain() async {
     final RecordingCanvas rc =
         RecordingCanvas(const Rect.fromLTRB(0, 0, 400, 300));
     rc.save();
-    rc.drawImage(createTestImage(), const Offset(0, 0), SurfacePaint());
+    rc.drawImage(createTestImage(), Offset.zero, SurfacePaint());
     rc.restore();
     await canvasScreenshot(rc, 'draw_image',
         region: const Rect.fromLTWH(0, 0, 500, 500));
@@ -43,7 +42,7 @@ Future<void> testMain() async {
     rc.save();
     rc.translate(50.0, 100.0);
     rc.rotate(math.pi / 4.0);
-    rc.drawImage(createTestImage(), const Offset(0, 0), SurfacePaint());
+    rc.drawImage(createTestImage(), Offset.zero, SurfacePaint());
     rc.restore();
     await canvasScreenshot(rc, 'draw_image_with_transform',
         region: const Rect.fromLTWH(0, 0, 500, 500));
@@ -359,13 +358,19 @@ Future<void> testMain() async {
     final Picture picture = recorder.endRecording();
 
     final SurfaceSceneBuilder builder = SurfaceSceneBuilder();
-    builder.addPicture(const Offset(0, 0), picture);
+    builder.addPicture(Offset.zero, picture);
 
     // Wrap in <flt-scene> so that our CSS selectors kick in.
-    final html.Element sceneElement = html.Element.tag('flt-scene');
+    final DomElement sceneElement = createDomElement('flt-scene');
+    if (isIosSafari) {
+      // Shrink to fit on the iPhone screen.
+      sceneElement.style.position = 'absolute';
+      sceneElement.style.transformOrigin = '0 0 0';
+      sceneElement.style.transform = 'scale(0.3)';
+    }
     try {
       sceneElement.append(builder.build().webOnlyRootElement!);
-      html.document.body!.append(sceneElement);
+      domDocument.body!.append(sceneElement);
       await matchGoldenFile('draw_nine_slice.png',
           region: region, maxDiffRatePercent: 0);
     } finally {
@@ -392,13 +397,19 @@ Future<void> testMain() async {
     final Picture picture = recorder.endRecording();
 
     final SurfaceSceneBuilder builder = SurfaceSceneBuilder();
-    builder.addPicture(const Offset(0, 0), picture);
+    builder.addPicture(Offset.zero, picture);
 
     // Wrap in <flt-scene> so that our CSS selectors kick in.
-    final html.Element sceneElement = html.Element.tag('flt-scene');
+    final DomElement sceneElement = createDomElement('flt-scene');
+    if (isIosSafari) {
+      // Shrink to fit on the iPhone screen.
+      sceneElement.style.position = 'absolute';
+      sceneElement.style.transformOrigin = '0 0 0';
+      sceneElement.style.transform = 'scale(0.3)';
+    }
     try {
       sceneElement.append(builder.build().webOnlyRootElement!);
-      html.document.body!.append(sceneElement);
+      domDocument.body!.append(sceneElement);
       await matchGoldenFile('draw_nine_slice_empty_center.png',
           region: region, maxDiffRatePercent: 0);
     } finally {
@@ -434,7 +445,7 @@ Future<void> testMain() async {
     const Rect region = Rect.fromLTRB(0, 0, 200, 200);
     final RecordingCanvas canvas = RecordingCanvas(region);
     canvas.translate(10, 10);
-    canvas.drawImage(createTestImage(), const Offset(0, 0), SurfacePaint());
+    canvas.drawImage(createTestImage(), Offset.zero, SurfacePaint());
     final Matrix4 transform = Matrix4.identity()
       ..setRotationY(0.8)
       ..setEntry(3, 2, 0.0005); // perspective
@@ -452,7 +463,7 @@ Future<void> testMain() async {
     final RecordingCanvas canvas = RecordingCanvas(region);
     canvas.drawRect(region, SurfacePaint()..color = const Color(0xFFE0E0E0));
     canvas.translate(10, 10);
-    canvas.drawImage(createTestImage(), const Offset(0, 0), SurfacePaint());
+    canvas.drawImage(createTestImage(), Offset.zero, SurfacePaint());
     final Matrix4 transform = Matrix4.identity()
       ..setRotationY(0.8)
       ..setEntry(3, 2, 0.0005); // perspective
@@ -714,16 +725,16 @@ const String base64ImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUh'
 
 HtmlImage createNineSliceImage() {
   return HtmlImage(
-    html.ImageElement()..src = base64ImageData,
+    createDomHTMLImageElement()..src = base64ImageData,
     60,
     60,
   );
 }
 
 HtmlImage createTestImage({int width = 100, int height = 50}) {
-  final html.CanvasElement canvas =
-      html.CanvasElement(width: width, height: height);
-  final html.CanvasRenderingContext2D ctx = canvas.context2D;
+  final DomCanvasElement canvas =
+      createDomCanvasElement(width: width, height: height);
+  final DomCanvasRenderingContext2D ctx = canvas.context2D;
   ctx.fillStyle = '#E04040';
   ctx.fillRect(0, 0, 33, 50);
   ctx.fill();
@@ -733,8 +744,8 @@ HtmlImage createTestImage({int width = 100, int height = 50}) {
   ctx.fillStyle = '#2040E0';
   ctx.fillRect(66, 0, 33, 50);
   ctx.fill();
-  final html.ImageElement imageElement = html.ImageElement();
-  imageElement.src = js_util.callMethod(canvas, 'toDataURL', <dynamic>[]) as String;
+  final DomHTMLImageElement imageElement = createDomHTMLImageElement();
+  imageElement.src = js_util.callMethod<String>(canvas, 'toDataURL', <dynamic>[]);
   return HtmlImage(imageElement, width, height);
 }
 

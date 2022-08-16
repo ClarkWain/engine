@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:html' as html;
-
 import 'package:test/bootstrap/browser.dart';
 import 'package:test/test.dart';
 import 'package:ui/src/engine.dart';
@@ -25,7 +23,7 @@ Future<void> testMain() async {
   const double kDashLength = 5.0;
 
   // Commit a recording canvas to a bitmap, and compare with the expected
-  Future<void> _checkScreenshot(RecordingCanvas rc, String fileName,
+  Future<void> checkScreenshot(RecordingCanvas rc, String fileName,
       {Rect region = const Rect.fromLTWH(0, 0, 500, 500)}) async {
     final EngineCanvas engineCanvas = BitmapCanvas(screenRect,
         RenderStrategy());
@@ -33,10 +31,16 @@ Future<void> testMain() async {
     rc.apply(engineCanvas, screenRect);
 
     // Wrap in <flt-scene> so that our CSS selectors kick in.
-    final html.Element sceneElement = html.Element.tag('flt-scene');
+    final DomElement sceneElement = createDomElement('flt-scene');
+    if (isIosSafari) {
+      // Shrink to fit on the iPhone screen.
+      sceneElement.style.position = 'absolute';
+      sceneElement.style.transformOrigin = '0 0 0';
+      sceneElement.style.transform = 'scale(0.3)';
+    }
     try {
       sceneElement.append(engineCanvas.rootElement);
-      html.document.body!.append(sceneElement);
+      domDocument.body!.append(sceneElement);
       await matchGoldenFile('$fileName.png', region: region);
     } finally {
       // The page is reused across tests, so remove the element after taking the
@@ -45,11 +49,11 @@ Future<void> testMain() async {
     }
   }
 
-  setUp(() async {
+  setUpAll(() async {
     debugEmulateFlutterTesterEnvironment = true;
     await webOnlyInitializePlatform();
-    webOnlyFontCollection.debugRegisterTestFonts();
-    await webOnlyFontCollection.ensureFontsLoaded();
+    fontCollection.debugRegisterTestFonts();
+    await fontCollection.ensureFontsLoaded();
   });
 
   test('Should calculate tangent on line', () async {
@@ -146,7 +150,7 @@ Future<void> testMain() async {
       }
     }
     rc.drawPath(dashedPath, redPaint);
-    await _checkScreenshot(rc, 'path_dash_quadratic');
+    await checkScreenshot(rc, 'path_dash_quadratic');
   });
 
   // Test for extractPath to draw 5 pixel length dashed line using cubic curve.
@@ -200,6 +204,6 @@ Future<void> testMain() async {
       }
     }
     rc.drawPath(dashedPath, redPaint);
-    await _checkScreenshot(rc, 'path_dash_cubic');
+    await checkScreenshot(rc, 'path_dash_cubic');
   });
 }

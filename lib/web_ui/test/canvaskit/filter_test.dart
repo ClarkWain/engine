@@ -46,9 +46,9 @@ void testMain() {
     ];
   }
 
-  group('ImageFilters', () {
-    setUpCanvasKitTest();
+  setUpCanvasKitTest();
 
+  group('ImageFilters', () {
     test('can be constructed', () {
       final CkImageFilter imageFilter = CkImageFilter.blur(sigmaX: 5, sigmaY: 10, tileMode: ui.TileMode.clamp);
       expect(imageFilter, isA<CkImageFilter>());
@@ -89,12 +89,9 @@ void testMain() {
       expect((paint.imageFilter! as ManagedSkiaObject<Object>).skiaObject, same(skiaFilter));
     });
 
-  // TODO(hterkelsen): https://github.com/flutter/flutter/issues/60040
-  }, skip: isIosSafari);
+  });
 
   group('MaskFilter', () {
-    setUpCanvasKitTest();
-
     test('with 0 sigma can be set on a Paint', () {
       final ui.Paint paint = ui.Paint();
       const ui.MaskFilter filter = ui.MaskFilter.blur(ui.BlurStyle.normal, 0);
@@ -102,6 +99,5 @@ void testMain() {
       expect(() => paint.maskFilter = filter, isNot(throwsException));
     });
 
-  // TODO(hterkelsen): https://github.com/flutter/flutter/issues/60040
-  }, skip: isIosSafari);
+  });
 }

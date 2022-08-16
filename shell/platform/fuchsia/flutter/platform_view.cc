@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "flow/embedded_views.h"
+#include "pointer_injector_delegate.h"
 #define RAPIDJSON_HAS_STDSTRING 1
 
 #include "platform_view.h"
@@ -24,42 +25,29 @@
 
 #include "logging.h"
 #include "runtime/dart/utils/inlines.h"
+#include "text_delegate.h"
 #include "vsync_waiter.h"
 
 namespace flutter_runner {
 
 static constexpr char kFlutterPlatformChannel[] = "flutter/platform";
-static constexpr char kTextInputChannel[] = "flutter/textinput";
-static constexpr char kKeyEventChannel[] = "flutter/keyevent";
 static constexpr char kAccessibilityChannel[] = "flutter/accessibility";
 static constexpr char kFlutterPlatformViewsChannel[] = "flutter/platform_views";
 static constexpr char kFuchsiaShaderWarmupChannel[] = "fuchsia/shader_warmup";
 
-// FL(77): Terminate engine if Fuchsia system FIDL connections have error.
-template <class T>
-void SetInterfaceErrorHandler(fidl::InterfacePtr<T>& interface,
-                              std::string name) {
-  interface.set_error_handler([name](zx_status_t status) {
-    FML_LOG(ERROR) << "Interface error on: " << name << ", status: " << status;
-  });
-}
-template <class T>
-void SetInterfaceErrorHandler(fidl::Binding<T>& binding, std::string name) {
-  binding.set_error_handler([name](zx_status_t status) {
-    FML_LOG(ERROR) << "Binding error on: " << name << ", status: " << status;
-  });
-}
-
 PlatformView::PlatformView(
+    bool is_flatland,
     flutter::PlatformView::Delegate& delegate,
     flutter::TaskRunners task_runners,
     fuchsia::ui::views::ViewRef view_ref,
     std::shared_ptr<flutter::ExternalViewEmbedder> external_view_embedder,
-    fidl::InterfaceHandle<fuchsia::ui::input::ImeService> ime_service,
-    fidl::InterfaceHandle<fuchsia::ui::input3::Keyboard> keyboard,
-    fidl::InterfaceHandle<fuchsia::ui::pointer::TouchSource> touch_source,
-    fidl::InterfaceHandle<fuchsia::ui::views::Focuser> focuser,
-    fidl::InterfaceHandle<fuchsia::ui::views::ViewRefFocused> view_ref_focused,
+    fuchsia::ui::input::ImeServiceHandle ime_service,
+    fuchsia::ui::input3::KeyboardHandle keyboard,
+    fuchsia::ui::pointer::TouchSourceHandle touch_source,
+    fuchsia::ui::pointer::MouseSourceHandle mouse_source,
+    fuchsia::ui::views::FocuserHandle focuser,
+    fuchsia::ui::views::ViewRefFocusedHandle view_ref_focused,
+    fuchsia::ui::pointerinjector::RegistryHandle pointerinjector_registry,
     OnEnableWireframe wireframe_enabled_callback,
     OnUpdateView on_update_view_callback,
     OnCreateSurface on_create_surface_callback,
@@ -75,11 +63,8 @@ PlatformView::PlatformView(
           std::make_shared<FocusDelegate>(std::move(view_ref_focused),
                                           std::move(focuser))),
       pointer_delegate_(
-          std::make_shared<PointerDelegate>(std::move(touch_source))),
-      ime_client_(this),
-      text_sync_service_(ime_service.Bind()),
-      keyboard_listener_binding_(this),
-      keyboard_(keyboard.Bind()),
+          std::make_shared<PointerDelegate>(std::move(touch_source),
+                                            std::move(mouse_source))),
       wireframe_enabled_callback_(std::move(wireframe_enabled_callback)),
       on_update_view_callback_(std::move(on_update_view_callback)),
       on_create_surface_callback_(std::move(on_create_surface_callback)),
@@ -91,16 +76,21 @@ PlatformView::PlatformView(
       await_vsync_for_secondary_callback_callback_(
           await_vsync_for_secondary_callback_callback),
       weak_factory_(this) {
-  // Register all error handlers.
-  SetInterfaceErrorHandler(ime_, "Input Method Editor");
-  SetInterfaceErrorHandler(ime_client_, "IME Client");
-  SetInterfaceErrorHandler(text_sync_service_, "Text Sync Service");
-  SetInterfaceErrorHandler(keyboard_listener_binding_, "Keyboard Listener");
-  SetInterfaceErrorHandler(keyboard_, "Keyboard");
+  fuchsia::ui::views::ViewRef view_ref_clone;
+  fidl::Clone(view_ref, &view_ref_clone);
 
-  // Configure keyboard listener.
-  keyboard_->AddListener(std::move(view_ref),
-                         keyboard_listener_binding_.NewBinding(), [] {});
+  text_delegate_ =
+      std::make_unique<TextDelegate>(
+          std::move(view_ref), std::move(ime_service), std::move(keyboard),
+          [weak = weak_factory_.GetWeakPtr()](
+              std::unique_ptr<flutter::PlatformMessage> message) {
+            if (!weak) {
+              FML_LOG(WARNING)
+                  << "PlatformView use-after-free attempted. Ignoring.";
+            }
+            weak->delegate_.OnPlatformViewDispatchPlatformMessage(
+                std::move(message));
+          });
 
   // Begin watching for focus changes.
   focus_delegate_->WatchLoop([weak = weak_factory_.GetWeakPtr()](bool focused) {
@@ -111,10 +101,10 @@ PlatformView::PlatformView(
 
     // Ensure last_text_state_ is set to make sure Flutter actually wants
     // an IME.
-    if (focused && weak->last_text_state_) {
-      weak->ActivateIme();
+    if (focused && weak->text_delegate_->HasTextState()) {
+      weak->text_delegate_->ActivateIme();
     } else if (!focused) {
-      weak->DeactivateIme();
+      weak->text_delegate_->DeactivateIme();
     }
   });
 
@@ -126,7 +116,7 @@ PlatformView::PlatformView(
       return;
     }
 
-    if (events.size() == 0) {
+    if (events.empty()) {
       return;  // No work, bounce out.
     }
 
@@ -135,14 +125,20 @@ PlatformView::PlatformView(
     auto packet = std::make_unique<flutter::PointerDataPacket>(events.size());
     for (size_t i = 0; i < events.size(); ++i) {
       auto& event = events[i];
-      // Translate logical to physical coordinates, as per flutter::PointerData
-      // contract. Done here because pixel ratio comes from the graphics API.
+      // Translate logical to physical coordinates, as per
+      // flutter::PointerData contract. Done here because pixel ratio comes
+      // from the graphics API.
       event.physical_x = event.physical_x * pixel_ratio;
       event.physical_y = event.physical_y * pixel_ratio;
       packet->SetPointerData(i, event);
     }
     weak->DispatchPointerDataPacket(std::move(packet));
   });
+
+  // Configure the pointer injector delegate.
+  pointer_injector_delegate_ = std::make_unique<PointerInjectorDelegate>(
+      std::move(pointerinjector_registry), std::move(view_ref_clone),
+      is_flatland);
 
   // Finally! Register the native platform message handlers.
   RegisterPlatformMessageHandlers();
@@ -155,8 +151,8 @@ void PlatformView::RegisterPlatformMessageHandlers() {
       std::bind(&PlatformView::HandleFlutterPlatformChannelPlatformMessage,
                 this, std::placeholders::_1);
   platform_message_handlers_[kTextInputChannel] =
-      std::bind(&PlatformView::HandleFlutterTextInputChannelPlatformMessage,
-                this, std::placeholders::_1);
+      std::bind(&TextDelegate::HandleFlutterTextInputChannelPlatformMessage,
+                text_delegate_.get(), std::placeholders::_1);
   platform_message_handlers_[kAccessibilityChannel] =
       std::bind(&PlatformView::HandleAccessibilityChannelPlatformMessage, this,
                 std::placeholders::_1);
@@ -166,84 +162,6 @@ void PlatformView::RegisterPlatformMessageHandlers() {
   platform_message_handlers_[kFuchsiaShaderWarmupChannel] =
       std::bind(&HandleFuchsiaShaderWarmupChannelPlatformMessage,
                 on_shader_warmup_, std::placeholders::_1);
-}
-
-// |fuchsia::ui::input::InputMethodEditorClient|
-void PlatformView::DidUpdateState(
-    fuchsia::ui::input::TextInputState state,
-    std::unique_ptr<fuchsia::ui::input::InputEvent> input_event) {
-  rapidjson::Document document;
-  auto& allocator = document.GetAllocator();
-  rapidjson::Value encoded_state(rapidjson::kObjectType);
-  encoded_state.AddMember("text", state.text, allocator);
-  encoded_state.AddMember("selectionBase", state.selection.base, allocator);
-  encoded_state.AddMember("selectionExtent", state.selection.extent, allocator);
-  switch (state.selection.affinity) {
-    case fuchsia::ui::input::TextAffinity::UPSTREAM:
-      encoded_state.AddMember("selectionAffinity",
-                              rapidjson::Value("TextAffinity.upstream"),
-                              allocator);
-      break;
-    case fuchsia::ui::input::TextAffinity::DOWNSTREAM:
-      encoded_state.AddMember("selectionAffinity",
-                              rapidjson::Value("TextAffinity.downstream"),
-                              allocator);
-      break;
-  }
-  encoded_state.AddMember("selectionIsDirectional", true, allocator);
-  encoded_state.AddMember("composingBase", state.composing.start, allocator);
-  encoded_state.AddMember("composingExtent", state.composing.end, allocator);
-
-  rapidjson::Value args(rapidjson::kArrayType);
-  args.PushBack(current_text_input_client_, allocator);
-  args.PushBack(encoded_state, allocator);
-
-  document.SetObject();
-  document.AddMember("method",
-                     rapidjson::Value("TextInputClient.updateEditingState"),
-                     allocator);
-  document.AddMember("args", args, allocator);
-
-  rapidjson::StringBuffer buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  document.Accept(writer);
-
-  const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.GetString());
-  DispatchPlatformMessage(std::make_unique<flutter::PlatformMessage>(
-      kTextInputChannel,                                 // channel
-      fml::MallocMapping::Copy(data, buffer.GetSize()),  // message
-      nullptr)                                           // response
-  );
-  last_text_state_ =
-      std::make_unique<fuchsia::ui::input::TextInputState>(state);
-}
-
-// |fuchsia::ui::input::InputMethodEditorClient|
-void PlatformView::OnAction(fuchsia::ui::input::InputMethodAction action) {
-  rapidjson::Document document;
-  auto& allocator = document.GetAllocator();
-
-  rapidjson::Value args(rapidjson::kArrayType);
-  args.PushBack(current_text_input_client_, allocator);
-
-  // Done is currently the only text input action defined by Flutter.
-  args.PushBack("TextInputAction.done", allocator);
-
-  document.SetObject();
-  document.AddMember(
-      "method", rapidjson::Value("TextInputClient.performAction"), allocator);
-  document.AddMember("args", args, allocator);
-
-  rapidjson::StringBuffer buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  document.Accept(writer);
-
-  const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.GetString());
-  DispatchPlatformMessage(std::make_unique<flutter::PlatformMessage>(
-      kTextInputChannel,                                 // channel
-      fml::MallocMapping::Copy(data, buffer.GetSize()),  // message
-      nullptr)                                           // response
-  );
 }
 
 static flutter::PointerData::Change GetChangeFromPointerEventPhase(
@@ -363,18 +281,23 @@ bool PlatformView::OnHandlePointerEvent(
       break;
     case flutter::PointerData::Change::kAdd:
       if (down_pointers_.count(pointer_data.device) != 0) {
-        FML_DLOG(ERROR) << "Received add event for down pointer.";
+        FML_LOG(ERROR) << "Received add event for down pointer.";
       }
       break;
     case flutter::PointerData::Change::kRemove:
       if (down_pointers_.count(pointer_data.device) != 0) {
-        FML_DLOG(ERROR) << "Received remove event for down pointer.";
+        FML_LOG(ERROR) << "Received remove event for down pointer.";
       }
       break;
     case flutter::PointerData::Change::kHover:
       if (down_pointers_.count(pointer_data.device) != 0) {
-        FML_DLOG(ERROR) << "Received hover event for down pointer.";
+        FML_LOG(ERROR) << "Received hover event for down pointer.";
       }
+      break;
+    case flutter::PointerData::Change::kPanZoomStart:
+    case flutter::PointerData::Change::kPanZoomUpdate:
+    case flutter::PointerData::Change::kPanZoomEnd:
+      FML_DLOG(ERROR) << "Unexpectedly received pointer pan/zoom event";
       break;
   }
 
@@ -382,77 +305,6 @@ bool PlatformView::OnHandlePointerEvent(
   packet->SetPointerData(0, pointer_data);
   DispatchPointerDataPacket(std::move(packet));
   return true;
-}
-
-// |fuchsia::ui:input3::KeyboardListener|
-void PlatformView::OnKeyEvent(
-    fuchsia::ui::input3::KeyEvent key_event,
-    fuchsia::ui::input3::KeyboardListener::OnKeyEventCallback callback) {
-  const char* type = nullptr;
-  switch (key_event.type()) {
-    case fuchsia::ui::input3::KeyEventType::PRESSED:
-      type = "keydown";
-      break;
-    case fuchsia::ui::input3::KeyEventType::RELEASED:
-      type = "keyup";
-      break;
-    case fuchsia::ui::input3::KeyEventType::SYNC:
-      // What, if anything, should happen here?
-    case fuchsia::ui::input3::KeyEventType::CANCEL:
-      // What, if anything, should happen here?
-    default:
-      break;
-  }
-  if (type == nullptr) {
-    FML_DLOG(ERROR) << "Unknown key event phase.";
-    callback(fuchsia::ui::input3::KeyEventStatus::NOT_HANDLED);
-    return;
-  }
-  keyboard_translator_.ConsumeEvent(std::move(key_event));
-
-  rapidjson::Document document;
-  auto& allocator = document.GetAllocator();
-  document.SetObject();
-  document.AddMember("type", rapidjson::Value(type, strlen(type)), allocator);
-  document.AddMember("keymap", rapidjson::Value("fuchsia"), allocator);
-  document.AddMember("hidUsage", keyboard_translator_.LastHIDUsage(),
-                     allocator);
-  document.AddMember("codePoint", keyboard_translator_.LastCodePoint(),
-                     allocator);
-  document.AddMember("modifiers", keyboard_translator_.Modifiers(), allocator);
-  rapidjson::StringBuffer buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  document.Accept(writer);
-
-  const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.GetString());
-  DispatchPlatformMessage(std::make_unique<flutter::PlatformMessage>(
-      kKeyEventChannel,                                  // channel
-      fml::MallocMapping::Copy(data, buffer.GetSize()),  // data
-      nullptr)                                           // response
-  );
-  callback(fuchsia::ui::input3::KeyEventStatus::HANDLED);
-}
-
-void PlatformView::ActivateIme() {
-  DEBUG_CHECK(last_text_state_, LOG_TAG, "");
-
-  text_sync_service_->GetInputMethodEditor(
-      fuchsia::ui::input::KeyboardType::TEXT,       // keyboard type
-      fuchsia::ui::input::InputMethodAction::DONE,  // input method action
-      *last_text_state_,                            // initial state
-      ime_client_.NewBinding(),                     // client
-      ime_.NewRequest()                             // editor
-  );
-}
-
-void PlatformView::DeactivateIme() {
-  if (ime_) {
-    text_sync_service_->HideKeyboard();
-    ime_ = nullptr;
-  }
-  if (ime_client_.is_bound()) {
-    ime_client_.Unbind();
-  }
 }
 
 // |flutter::PlatformView|
@@ -486,7 +338,7 @@ void PlatformView::HandlePlatformMessage(
     if (!already_errored) {
       FML_LOG(INFO)
           << "Platform view received message on channel '" << message->channel()
-          << "' with no registered handler. And empty response will be "
+          << "' with no registered handler. An empty response will be "
              "generated. Please implement the native message handler. This "
              "message will appear only once per channel.";
       unregistered_channels_.insert(channel);
@@ -560,100 +412,6 @@ bool PlatformView::HandleFlutterPlatformChannelPlatformMessage(
 
   // Fuchsia does not handle any platform messages at this time.
 
-  // Complete with an empty response.
-  return false;
-}
-
-// Channel handler for kTextInputChannel
-bool PlatformView::HandleFlutterTextInputChannelPlatformMessage(
-    std::unique_ptr<flutter::PlatformMessage> message) {
-  FML_DCHECK(message->channel() == kTextInputChannel);
-  const auto& data = message->data();
-  rapidjson::Document document;
-  document.Parse(reinterpret_cast<const char*>(data.GetMapping()),
-                 data.GetSize());
-  if (document.HasParseError() || !document.IsObject()) {
-    return false;
-  }
-  auto root = document.GetObject();
-  auto method = root.FindMember("method");
-  if (method == root.MemberEnd() || !method->value.IsString()) {
-    return false;
-  }
-
-  if (method->value == "TextInput.show") {
-    if (ime_) {
-      text_sync_service_->ShowKeyboard();
-    }
-  } else if (method->value == "TextInput.hide") {
-    if (ime_) {
-      text_sync_service_->HideKeyboard();
-    }
-  } else if (method->value == "TextInput.setClient") {
-    current_text_input_client_ = 0;
-    DeactivateIme();
-    auto args = root.FindMember("args");
-    if (args == root.MemberEnd() || !args->value.IsArray() ||
-        args->value.Size() != 2)
-      return false;
-    const auto& configuration = args->value[1];
-    if (!configuration.IsObject()) {
-      return false;
-    }
-    // TODO(abarth): Read the keyboard type from the configuration.
-    current_text_input_client_ = args->value[0].GetInt();
-
-    auto initial_text_input_state = fuchsia::ui::input::TextInputState{};
-    initial_text_input_state.text = "";
-    last_text_state_ = std::make_unique<fuchsia::ui::input::TextInputState>(
-        initial_text_input_state);
-    ActivateIme();
-  } else if (method->value == "TextInput.setEditingState") {
-    if (ime_) {
-      auto args_it = root.FindMember("args");
-      if (args_it == root.MemberEnd() || !args_it->value.IsObject()) {
-        return false;
-      }
-      const auto& args = args_it->value;
-      fuchsia::ui::input::TextInputState state;
-      state.text = "";
-      // TODO(abarth): Deserialize state.
-      auto text = args.FindMember("text");
-      if (text != args.MemberEnd() && text->value.IsString())
-        state.text = text->value.GetString();
-      auto selection_base = args.FindMember("selectionBase");
-      if (selection_base != args.MemberEnd() && selection_base->value.IsInt())
-        state.selection.base = selection_base->value.GetInt();
-      auto selection_extent = args.FindMember("selectionExtent");
-      if (selection_extent != args.MemberEnd() &&
-          selection_extent->value.IsInt())
-        state.selection.extent = selection_extent->value.GetInt();
-      auto selection_affinity = args.FindMember("selectionAffinity");
-      if (selection_affinity != args.MemberEnd() &&
-          selection_affinity->value.IsString() &&
-          selection_affinity->value == "TextAffinity.upstream")
-        state.selection.affinity = fuchsia::ui::input::TextAffinity::UPSTREAM;
-      else
-        state.selection.affinity = fuchsia::ui::input::TextAffinity::DOWNSTREAM;
-      // We ignore selectionIsDirectional because that concept doesn't exist on
-      // Fuchsia.
-      auto composing_base = args.FindMember("composingBase");
-      if (composing_base != args.MemberEnd() && composing_base->value.IsInt())
-        state.composing.start = composing_base->value.GetInt();
-      auto composing_extent = args.FindMember("composingExtent");
-      if (composing_extent != args.MemberEnd() &&
-          composing_extent->value.IsInt())
-        state.composing.end = composing_extent->value.GetInt();
-      ime_->SetState(std::move(state));
-    }
-  } else if (method->value == "TextInput.clearClient") {
-    current_text_input_client_ = 0;
-    last_text_state_ = nullptr;
-    DeactivateIme();
-  } else {
-    FML_DLOG(ERROR) << "Unknown " << message->channel() << " method "
-                    << method->value.GetString();
-  }
   // Complete with an empty response.
   return false;
 }
@@ -824,8 +582,12 @@ bool PlatformView::HandleFlutterPlatformViewsChannelPlatformMessage(
     }
   } else if (method.rfind("View.focus", 0) == 0) {
     return focus_delegate_->HandlePlatformMessage(root, message->response());
+  } else if (method.rfind(PointerInjectorDelegate::kPointerInjectorMethodPrefix,
+                          0) == 0) {
+    return pointer_injector_delegate_->HandlePlatformMessage(
+        root, message->response());
   } else {
-    FML_DLOG(ERROR) << "Unknown " << message->channel() << " method " << method;
+    FML_LOG(ERROR) << "Unknown " << message->channel() << " method " << method;
   }
   // Complete with an empty response by default.
   return false;

@@ -4,19 +4,25 @@
 
 #include "flutter/flow/layers/color_filter_layer.h"
 
+#include "flutter/display_list/display_list_comparable.h"
+#include "flutter/display_list/display_list_paint.h"
+#include "flutter/flow/raster_cache_item.h"
+#include "flutter/flow/raster_cache_util.h"
+
 namespace flutter {
 
-ColorFilterLayer::ColorFilterLayer(sk_sp<SkColorFilter> filter)
-    : filter_(std::move(filter)) {}
-
-#ifdef FLUTTER_ENABLE_DIFF_CONTEXT
+ColorFilterLayer::ColorFilterLayer(std::shared_ptr<const DlColorFilter> filter)
+    : CacheableContainerLayer(
+          RasterCacheUtil::kMinimumRendersBeforeCachingFilterLayer,
+          true),
+      filter_(std::move(filter)) {}
 
 void ColorFilterLayer::Diff(DiffContext* context, const Layer* old_layer) {
   DiffContext::AutoSubtreeRestore subtree(context);
   auto* prev = static_cast<const ColorFilterLayer*>(old_layer);
   if (!context->IsSubtreeDirty()) {
     FML_DCHECK(prev);
-    if (filter_ != prev->filter_) {
+    if (NotEquals(filter_, prev->filter_)) {
       context->MarkSubtreeDirty(context->GetOldLayerPaintRegion(old_layer));
     }
   }
@@ -26,25 +32,44 @@ void ColorFilterLayer::Diff(DiffContext* context, const Layer* old_layer) {
   context->SetLayerPaintRegion(this, context->CurrentSubtreeRegion());
 }
 
-#endif  // FLUTTER_ENABLE_DIFF_CONTEXT
-
 void ColorFilterLayer::Preroll(PrerollContext* context,
                                const SkMatrix& matrix) {
   Layer::AutoPrerollSaveLayerState save =
       Layer::AutoPrerollSaveLayerState::Create(context);
+  AutoCache cache = AutoCache(layer_raster_cache_item_.get(), context, matrix);
+
   ContainerLayer::Preroll(context, matrix);
+  // We always use a saveLayer (or a cached rendering), so we
+  // can always apply opacity in those cases.
+  context->subtree_can_inherit_opacity = true;
 }
 
 void ColorFilterLayer::Paint(PaintContext& context) const {
   TRACE_EVENT0("flutter", "ColorFilterLayer::Paint");
   FML_DCHECK(needs_painting(context));
 
-  SkPaint paint;
-  paint.setColorFilter(filter_);
+  if (context.raster_cache) {
+    AutoCachePaint cache_paint(context);
+    if (layer_raster_cache_item_->IsCacheChildren()) {
+      cache_paint.setColorFilter(filter_.get());
+    }
+    if (layer_raster_cache_item_->Draw(context, cache_paint.sk_paint())) {
+      return;
+    }
+  }
 
-  Layer::AutoSaveLayer save =
-      Layer::AutoSaveLayer::Create(context, paint_bounds(), &paint);
-  PaintChildren(context);
+  AutoCachePaint cache_paint(context);
+  cache_paint.setColorFilter(filter_.get());
+  if (context.leaf_nodes_builder) {
+    context.leaf_nodes_builder->saveLayer(&paint_bounds(),
+                                          cache_paint.dl_paint());
+    PaintChildren(context);
+    context.leaf_nodes_builder->restore();
+  } else {
+    Layer::AutoSaveLayer save = Layer::AutoSaveLayer::Create(
+        context, paint_bounds(), cache_paint.sk_paint());
+    PaintChildren(context);
+  }
 }
 
 }  // namespace flutter

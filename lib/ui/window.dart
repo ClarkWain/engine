@@ -1,8 +1,6 @@
 // Copyright 2013 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-// @dart = 2.12
 part of dart.ui;
 
 /// A view into which a Flutter [Scene] is drawn.
@@ -156,7 +154,7 @@ abstract class FlutterView {
 
   /// The number of physical pixels on each side of the display rectangle into
   /// which the view can render, but which may be partially obscured by system
-  /// UI (such as the system notification area), or or physical intrusions in
+  /// UI (such as the system notification area), or physical intrusions in
   /// the display (e.g. overscan regions on television screens or phone sensor
   /// housings).
   ///
@@ -199,7 +197,7 @@ abstract class FlutterView {
 
   /// The number of physical pixels on each side of the display rectangle into
   /// which the view can render, but which may be partially obscured by system
-  /// UI (such as the system notification area), or or physical intrusions in
+  /// UI (such as the system notification area), or physical intrusions in
   /// the display (e.g. overscan regions on television screens or phone sensor
   /// housings).
   ///
@@ -224,6 +222,17 @@ abstract class FlutterView {
   /// * [Scaffold], which automatically applies the padding in material design
   ///   applications.
   WindowPadding get padding => viewConfiguration.padding;
+
+  /// {@macro dart.ui.ViewConfiguration.displayFeatures}
+  ///
+  /// When this changes, [onMetricsChanged] is called.
+  ///
+  /// See also:
+  ///
+  ///  * [WidgetsBindingObserver], for a mechanism at the widgets layer to
+  ///    observe when this value changes.
+  ///  * [MediaQuery.of], a simpler mechanism to access this data.
+  List<DisplayFeature> get displayFeatures => viewConfiguration.displayFeatures;
 
   /// Updates the view's rendering on the GPU with the newly provided [Scene].
   ///
@@ -253,8 +262,10 @@ abstract class FlutterView {
   ///   scheduling of frames.
   /// * [RendererBinding], the Flutter framework class which manages layout and
   ///   painting.
-  void render(Scene scene) => _render(scene, this);
-  void _render(Scene scene, FlutterView view) native 'PlatformConfiguration_render';
+  void render(Scene scene) => _render(scene);
+
+  @FfiNative<Void Function(Pointer<Void>)>('PlatformConfigurationNativeApi::Render')
+  external static void _render(Scene scene);
 }
 
 /// A top-level platform window displaying a Flutter layer tree drawn from a
@@ -305,8 +316,8 @@ class FlutterWindow extends FlutterView {
 /// [window], or [PlatformDispatcher.instance]. See the documentation for
 /// [PlatformDispatcher.instance] for more details about this recommendation.
 class SingletonFlutterWindow extends FlutterWindow {
-  SingletonFlutterWindow._(Object windowId, PlatformDispatcher platformDispatcher)
-      : super._(windowId, platformDispatcher);
+  SingletonFlutterWindow._(super.windowId, super.platformDispatcher)
+      : super._();
 
   /// A callback that is invoked whenever the [devicePixelRatio],
   /// [physicalSize], [padding], [viewInsets], [PlatformDispatcher.views], or
@@ -414,6 +425,24 @@ class SingletonFlutterWindow extends FlutterWindow {
   ///    observe when this value changes.
   double get textScaleFactor => platformDispatcher.textScaleFactor;
 
+  /// Whether the spell check service is supported on the current platform.
+  ///
+  /// {@macro dart.ui.window.accessorForwardWarning}
+  ///
+  /// This option is used by [EditableTextState] to define its
+  /// [SpellCheckConfiguration] when spell check is enabled, but no spell check
+  /// service is specified.
+  bool get nativeSpellCheckServiceDefined => platformDispatcher.nativeSpellCheckServiceDefined;
+
+  /// Whether briefly displaying the characters as you type in obscured text
+  /// fields is enabled in system settings.
+  ///
+  /// See also:
+  ///
+  ///  * [EditableText.obscureText], which when set to true hides the text in
+  ///    the text field.
+  bool get brieflyShowPassword => platformDispatcher.brieflyShowPassword;
+
   /// The setting indicating whether time should always be shown in the 24-hour
   /// format.
   ///
@@ -460,6 +489,27 @@ class SingletonFlutterWindow extends FlutterWindow {
   VoidCallback? get onPlatformBrightnessChanged => platformDispatcher.onPlatformBrightnessChanged;
   set onPlatformBrightnessChanged(VoidCallback? callback) {
     platformDispatcher.onPlatformBrightnessChanged = callback;
+  }
+
+  /// The setting indicating the system font of the host platform.
+  ///
+  /// {@macro dart.ui.window.accessorForwardWarning}
+  String? get systemFontFamily => platformDispatcher.systemFontFamily;
+
+  /// A callback that is invoked whenever [systemFontFamily] changes value.
+  ///
+  /// {@macro dart.ui.window.accessorForwardWarning}
+  ///
+  /// The framework invokes this callback in the same zone in which the
+  /// callback was set.
+  ///
+  /// See also:
+  ///
+  ///  * [WidgetsBindingObserver], for a mechanism at the widgets layer to
+  ///    observe when this callback is invoked.
+  VoidCallback? get onSystemFontFamilyChanged => platformDispatcher.onSystemFontFamilyChanged;
+  set onSystemFontFamilyChanged(VoidCallback? callback) {
+    platformDispatcher.onSystemFontFamilyChanged = callback;
   }
 
   /// A callback that is invoked to notify the window that it is an appropriate
@@ -745,12 +795,13 @@ class SingletonFlutterWindow extends FlutterWindow {
 class AccessibilityFeatures {
   const AccessibilityFeatures._(this._index);
 
-  static const int _kAccessibleNavigation = 1 << 0;
+  static const int _kAccessibleNavigationIndex = 1 << 0;
   static const int _kInvertColorsIndex = 1 << 1;
   static const int _kDisableAnimationsIndex = 1 << 2;
   static const int _kBoldTextIndex = 1 << 3;
   static const int _kReduceMotionIndex = 1 << 4;
   static const int _kHighContrastIndex = 1 << 5;
+  static const int _kOnOffSwitchLabelsIndex = 1 << 6;
 
   // A bitfield which represents each enabled feature.
   final int _index;
@@ -759,7 +810,7 @@ class AccessibilityFeatures {
   /// interaction model of the device.
   ///
   /// For example, TalkBack on Android and VoiceOver on iOS enable this flag.
-  bool get accessibleNavigation => _kAccessibleNavigation & _index != 0;
+  bool get accessibleNavigation => _kAccessibleNavigationIndex & _index != 0;
 
   /// The platform is inverting the colors of the application.
   bool get invertColors => _kInvertColorsIndex & _index != 0;
@@ -783,28 +834,43 @@ class AccessibilityFeatures {
   /// Only supported on iOS.
   bool get highContrast => _kHighContrastIndex & _index != 0;
 
+  /// The platform is requesting to show on/off labels inside switches.
+  ///
+  /// Only supported on iOS.
+  bool get onOffSwitchLabels => _kOnOffSwitchLabelsIndex & _index != 0;
+
   @override
   String toString() {
     final List<String> features = <String>[];
-    if (accessibleNavigation)
+    if (accessibleNavigation) {
       features.add('accessibleNavigation');
-    if (invertColors)
+    }
+    if (invertColors) {
       features.add('invertColors');
-    if (disableAnimations)
+    }
+    if (disableAnimations) {
       features.add('disableAnimations');
-    if (boldText)
+    }
+    if (boldText) {
       features.add('boldText');
-    if (reduceMotion)
+    }
+    if (reduceMotion) {
       features.add('reduceMotion');
-    if (highContrast)
+    }
+    if (highContrast) {
       features.add('highContrast');
+    }
+    if (onOffSwitchLabels) {
+      features.add('onOffSwitchLabels');
+    }
     return 'AccessibilityFeatures$features';
   }
 
   @override
   bool operator ==(Object other) {
-    if (other.runtimeType != runtimeType)
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is AccessibilityFeatures
         && other._index == _index;
   }
@@ -917,15 +983,16 @@ class GestureSettings {
 
   @override
   bool operator ==(Object other) {
-    if (other.runtimeType != runtimeType)
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is GestureSettings &&
       other.physicalTouchSlop == physicalTouchSlop &&
       other.physicalDoubleTapSlop == physicalDoubleTapSlop;
   }
 
   @override
-  int get hashCode => hashValues(physicalTouchSlop, physicalDoubleTapSlop);
+  int get hashCode => Object.hash(physicalTouchSlop, physicalDoubleTapSlop);
 
   @override
   String toString() => 'GestureSettings(physicalTouchSlop: $physicalTouchSlop, physicalDoubleTapSlop: $physicalDoubleTapSlop)';

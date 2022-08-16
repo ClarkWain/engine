@@ -1,8 +1,6 @@
 // Copyright 2013 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-// @dart = 2.12
 part of dart.ui;
 
 /// Whether to slant the glyphs in the font
@@ -16,37 +14,40 @@ enum FontStyle {
 
 /// The thickness of the glyphs used to draw the text
 class FontWeight {
-  const FontWeight._(this.index);
+  const FontWeight._(this.index, this.value);
 
   /// The encoded integer value of this font weight.
   final int index;
 
+  /// The thickness value of this font weight.
+  final int value;
+
   /// Thin, the least thick
-  static const FontWeight w100 = FontWeight._(0);
+  static const FontWeight w100 = FontWeight._(0, 100);
 
   /// Extra-light
-  static const FontWeight w200 = FontWeight._(1);
+  static const FontWeight w200 = FontWeight._(1, 200);
 
   /// Light
-  static const FontWeight w300 = FontWeight._(2);
+  static const FontWeight w300 = FontWeight._(2, 300);
 
   /// Normal / regular / plain
-  static const FontWeight w400 = FontWeight._(3);
+  static const FontWeight w400 = FontWeight._(3, 400);
 
   /// Medium
-  static const FontWeight w500 = FontWeight._(4);
+  static const FontWeight w500 = FontWeight._(4, 500);
 
   /// Semi-bold
-  static const FontWeight w600 = FontWeight._(5);
+  static const FontWeight w600 = FontWeight._(5, 600);
 
   /// Bold
-  static const FontWeight w700 = FontWeight._(6);
+  static const FontWeight w700 = FontWeight._(6, 700);
 
   /// Extra-bold
-  static const FontWeight w800 = FontWeight._(7);
+  static const FontWeight w800 = FontWeight._(7, 800);
 
   /// Black, the most thick
-  static const FontWeight w900 = FontWeight._(8);
+  static const FontWeight w900 = FontWeight._(8, 900);
 
   /// The default font weight.
   static const FontWeight normal = w400;
@@ -82,8 +83,9 @@ class FontWeight {
   /// an [AnimationController].
   static FontWeight? lerp(FontWeight? a, FontWeight? b, double t) {
     assert(t != null);
-    if (a == null && b == null)
+    if (a == null && b == null) {
       return null;
+    }
     return values[_lerpInt((a ?? normal).index, (b ?? normal).index, t).round().clamp(0, 8)];
   }
 
@@ -109,77 +111,12 @@ class FontWeight {
 /// such as <https://wakamaifondue.com/> to examine your fonts to
 /// determine what features are available.
 ///
-/// {@tool sample --template=stateless_widget_material}
-///
+/// {@tool sample}
 /// This example shows usage of several OpenType font features,
 /// including Small Caps (selected manually using the "smcp" code),
 /// old-style figures, fractional ligatures, and stylistic sets.
 ///
-/// ```dart dartImports
-/// import 'dart:ui';
-/// ```
-///
-/// ```dart preamble
-/// final TextStyle titleStyle = TextStyle(
-///   fontSize: 18,
-///   fontFeatures: const <FontFeature>[FontFeature.enable('smcp')],
-///   color: Colors.blueGrey[600],
-/// );
-/// ```
-///
-/// ```dart
-/// Widget build(BuildContext context) {
-///   // The Cardo, Milonga and Raleway Dots fonts can be downloaded from
-///   // Google Fonts (https://www.google.com/fonts).
-///   return Scaffold(
-///     body: Center(
-///       child: Column(
-///         mainAxisAlignment: MainAxisAlignment.center,
-///         children: <Widget>[
-///           const Spacer(flex: 5),
-///           Text('regular numbers have their place:', style: titleStyle),
-///           const Text('The 1972 cup final was a 1-1 draw.',
-///               style: TextStyle(
-///                 fontFamily: 'Cardo',
-///                 fontSize: 24,
-///               )),
-///           const Spacer(),
-///           Text('but old-style figures blend well with lower case:',
-///               style: titleStyle),
-///           const Text('The 1972 cup final was a 1-1 draw.',
-///               style: TextStyle(
-///                   fontFamily: 'Cardo',
-///                   fontSize: 24,
-///                   fontFeatures: <FontFeature>[FontFeature.oldstyleFigures()])),
-///           const Spacer(),
-///           const Divider(),
-///           const Spacer(),
-///           Text('fractions look better with a custom ligature:',
-///               style: titleStyle),
-///           const Text('Add 1/2 tsp of flour and stir.',
-///               style: TextStyle(
-///                   fontFamily: 'Milonga',
-///                   fontSize: 24,
-///                   fontFeatures: <FontFeature>[FontFeature.alternativeFractions()])),
-///           const Spacer(),
-///           const Divider(),
-///           const Spacer(),
-///           Text('multiple stylistic sets in one font:', style: titleStyle),
-///           const Text('Raleway Dots',
-///               style: TextStyle(fontFamily: 'Raleway Dots', fontSize: 48)),
-///           Text('Raleway Dots',
-///               style: TextStyle(
-///                 fontFeatures: <FontFeature>[FontFeature.stylisticSet(1)],
-///                 fontFamily: 'Raleway Dots',
-///                 fontSize: 48,
-///               )),
-///           const Spacer(flex: 5),
-///         ],
-///       ),
-///     ),
-///   );
-/// }
-/// ```
+/// ** See code in examples/api/lib/ui/text/font_feature.0.dart **
 /// {@end-tool}
 ///
 /// See also:
@@ -230,13 +167,11 @@ class FontFeature {
   // Start of feature tag list.
   // ------------------------------------------------------------------------
 
-  // aalt
   /// Access alternative glyphs. (`aalt`)
   ///
   /// This feature selects the given glyph variant for glyphs in the span.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Raleway font supports several alternate glyphs. The code
   /// below shows how specific glyphs can be selected. With `aalt` set
   /// to zero, the default, the normal glyphs are used. With a
@@ -247,26 +182,9 @@ class FontFeature {
   /// (using [Text.rich]), the desired rendering for each glyph can be
   /// achieved.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Raleway font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'The infamous Tuna Torture.',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Raleway',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.alternative(1), // or 2, or 3, or...
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_aalt.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_alternative.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -274,7 +192,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ae#aalt>
   const FontFeature.alternative(this.value) : feature = 'aalt';
 
-  // afrc
   /// Use alternative ligatures to represent fractions. (`afrc`)
   ///
   /// When this feature is enabled (and the font supports it),
@@ -285,32 +202,14 @@ class FontFeature {
   ///
   /// This feature overrides all other features.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Ubuntu Mono font supports the `afrc` feature. It causes digits
   /// before slashes to become superscripted and digits after slashes to become
   /// subscripted. This contrasts to the effect seen with [FontFeature.fractions].
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Ubuntu Mono font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'Fractions: 1/2 2/3 3/4 4/5',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Ubuntu Mono',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.alternativeFractions(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_afrc.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_alternative_fractions.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -319,40 +218,21 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ae#afrc>
   const FontFeature.alternativeFractions() : feature = 'afrc', value = 1;
 
-  // calt
   /// Enable contextual alternates. (`calt`)
   ///
   /// With this feature enabled, specific glyphs may be replaced by
   /// alternatives based on nearby text.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Barriecito font supports the `calt` feature. It causes some
   /// letters in close proximity to other instances of themselves to
   /// use different glyphs, to give the appearance of more variation
   /// in the glyphs, rather than having each letter always use a
   /// particular glyph.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Barriecito font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     "Ooohh, we weren't going to tell him that.",
-  ///     style: TextStyle(
-  ///       fontFamily: 'Barriecito',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.contextualAlternates(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_calt.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_contextual_alternates.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -362,7 +242,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ae#calt>
   const FontFeature.contextualAlternates() : feature = 'calt', value = 1;
 
-  // case
   /// Enable case-sensitive forms. (`case`)
   ///
   /// Some glyphs, for example parentheses or operators, are typically
@@ -372,10 +251,9 @@ class FontFeature {
   ///
   /// This feature, when supported by the font, causes these glyphs to
   /// be shifted slightly, or otherwise adjusted, so as to form a more
-  /// aethestically pleasing combination with capital letters.
+  /// aesthetically pleasing combination with capital letters.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Piazzolla font supports the `case` feature. It causes
   /// parentheses, brackets, braces, guillemets, slashes, bullets, and
   /// some other glyphs (not shown below) to be shifted up slightly so
@@ -387,26 +265,9 @@ class FontFeature {
   /// The difference is very subtle. It may be most obvious when
   /// examining the square brackets compared to the capital A.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Piazzolla font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     '(A) [A] {A} «A» A/B A•B',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Piazzolla',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.caseSensitiveForms(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_case.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_case_sensitive_forms.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -414,7 +275,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ae#case>
   const FontFeature.caseSensitiveForms() : feature = 'case', value = 1;
 
-  // cvXX
   /// Select a character variant. (`cv01` through `cv99`)
   ///
   /// Fonts may have up to 99 character variant sets, numbered 1
@@ -425,8 +285,7 @@ class FontFeature {
   /// sets, controlled by the [FontFeature.stylisticSet] feature
   /// (`ssXX`).
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Source Code Pro font supports the `cvXX` feature for several
   /// characters. In the example below, variants 1 (`cv01`), 2
   /// (`cv02`), and 4 (`cv04`) are selected. Variant 1 changes the
@@ -441,28 +300,9 @@ class FontFeature {
   /// the set which affects the "g" character also affects theta and
   /// delta.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Source Code Pro font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return Text(
-  ///     'aáâ β gǵĝ θб Iiíî Ll',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Source Code Pro',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.characterVariant(1),
-  ///         FontFeature.characterVariant(2),
-  ///         FontFeature.characterVariant(4),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_cvXX.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_character_variant.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -476,38 +316,19 @@ class FontFeature {
     return FontFeature('cv${value.toString().padLeft(2, "0")}');
   }
 
-  // dnom
   /// Display digits as denominators. (`dnom`)
   ///
   /// This is typically used automatically by the font rendering
   /// system as part of the implementation of `frac` for the denominator
   /// part of fractions (see [FontFeature.fractions]).
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Piazzolla font supports the `dnom` feature. It causes
   /// the digits to be rendered smaller and near the bottom of the EM box.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Piazzolla font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'Fractions: 1/2 2/3 3/4 4/5',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Piazzolla',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.denominator(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_dnom.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_denominator.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -515,7 +336,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ae#dnom>
   const FontFeature.denominator() : feature = 'dnom', value = 1;
 
-  // frac
   /// Use ligatures to represent fractions. (`afrc`)
   ///
   /// When this feature is enabled (and the font supports it),
@@ -526,33 +346,15 @@ class FontFeature {
   /// This feature may imply the [FontFeature.numerator] and
   /// [FontFeature.denominator] features.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Ubuntu Mono font supports the `frac` feature. It causes
   /// digits around slashes to be turned into dedicated fraction
-  /// glpyhs. This contrasts to the effect seen with
+  /// glyphs. This contrasts to the effect seen with
   /// [FontFeature.alternativeFractions].
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Ubuntu Mono font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'Fractions: 1/2 2/3 3/4 4/5',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Ubuntu Mono',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.fractions(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_frac.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_fractions.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -561,10 +363,9 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_fj#frac>
   const FontFeature.fractions() : feature = 'frac', value = 1;
 
-  // hist
   /// Use historical forms. (`hist`)
   ///
-  /// Some fonts have alteratives for letters whose forms have changed
+  /// Some fonts have alternatives for letters whose forms have changed
   /// through the ages. In the Latin alphabet, this is common for
   /// example with the long-form "s" or the Fraktur "k". This feature enables
   /// those alternative glyphs.
@@ -574,33 +375,14 @@ class FontFeature {
   ///
   /// This feature may override other glyph-substitution features.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Cardo font supports the `hist` feature specifically for the
   /// letter "s": it changes occurrences of that letter for the glyph
   /// used by U+017F LATIN SMALL LETTER LONG S.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Cardo font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'VIBRANT fish assisted his business.',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Sorts Mill Goudy',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.historicalForms(), // Enables "hist".
-  ///         // Use FontFeature.historicalLigatures() to enable "hlig" as well.
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_historical.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_historical_forms.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -608,7 +390,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_fj#hist>
   const FontFeature.historicalForms() : feature = 'hist', value = 1;
 
-  // hlig
   /// Use historical ligatures. (`hlig`)
   ///
   /// Some fonts support ligatures that have fallen out of favor today,
@@ -632,8 +413,7 @@ class FontFeature {
   ///
   /// This feature may override other glyph-substitution features.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Cardo font supports the `hlig` feature. It has legacy
   /// ligatures for "VI" and "NT", and various ligatures involving the
   /// "long s". In the example below, both historical forms (`hist 1`)
@@ -646,27 +426,9 @@ class FontFeature {
   /// Observe in particular the position of the dot of the "i" in
   /// "business" in the various combinations of these features.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Cardo font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'VIBRANT fish assisted his business.',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Sorts Mill Goudy',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.historicalForms(), // Enables "hist".
-  ///         FontFeature.historicalLigatures() // Enables "hlig".
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_historical.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_historical_ligatures.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -674,7 +436,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_fj#hlig>
   const FontFeature.historicalLigatures() : feature = 'hlig', value = 1;
 
-  // lnum
   /// Use lining figures. (`lnum`)
   ///
   /// Some fonts have digits that, like lowercase latin letters, have
@@ -687,31 +448,13 @@ class FontFeature {
   ///
   /// This feature may conflict with [FontFeature.oldstyleFigures].
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Sorts Mill Goudy font supports the `lnum` feature. It causes
   /// digits to fit more seamlessly with capital letters.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Sorts Mill Goudy font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'CALL 311-555-2368 NOW!',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Sorts Mill Goudy',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.liningFigures(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_lnum.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_lining_figures.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -719,7 +462,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ko#lnum>
   const FontFeature.liningFigures() : feature = 'lnum', value = 1;
 
-  // locl
   /// Use locale-specific glyphs. (`locl`)
   ///
   /// Some characters, most notably those in the Unicode Han
@@ -728,7 +470,7 @@ class FontFeature {
   /// broken top line in Traditional Chinese, but a solid top line in
   /// Simplified Chinese, Japanese, Korean, and Vietnamese. This kind
   /// of variation also exists with other alphabets, for example
-  /// Cyrilic characters as used in the Bulgarian and Serbian
+  /// Cyrillic characters as used in the Bulgarian and Serbian
   /// alphabets vary from their Russian counterparts.
   ///
   /// A particular font may default to the forms for the locale for
@@ -745,31 +487,15 @@ class FontFeature {
   /// locale-awareness. (So does not specifying the locale in the
   /// first place, of course.)
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Noto Sans CJK font supports the `locl` feature for CJK characters.
   /// In this example, the `localeAware` feature is not explicitly used, as it is
   /// enabled by default. This example instead shows how to set the locale,
   /// thus demonstrating how Noto Sans adapts the glyph shapes to the locale.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Noto family of fonts can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     '次 化 刃 直 入 令',
-  ///     locale: Locale('zh', 'CN'), // or Locale('ja'), Locale('ko'), Locale('zh', 'TW'), etc
-  ///     style: TextStyle(
-  ///       fontFamily: 'Noto Sans',
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_locl.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_locale_aware.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -779,7 +505,6 @@ class FontFeature {
   ///  * <https://en.wikipedia.org/wiki/Cyrillic_script>
   const FontFeature.localeAware({ bool enable = true }) : feature = 'locl', value = enable ? 1 : 0;
 
-  // nalt
   /// Display alternative glyphs for numerals (alternate annotation forms). (`nalt`)
   ///
   /// Replaces glyphs used in numbering lists (e.g. 1, 2, 3...; or a, b, c...) with notational
@@ -789,8 +514,7 @@ class FontFeature {
   /// selects the set to use (a positive integer, or 0 to disable the
   /// feature). The default set if none is specified is 1.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Gothic A1 font supports several notational variant sets via
   /// the `nalt` feature.
   ///
@@ -802,26 +526,9 @@ class FontFeature {
   ///
   /// The code below shows how to select set 3.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Gothic A1 font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'abc 123',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Gothic A1',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.notationalForms(3), // circled letters and digits
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_nalt.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_notational_forms.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -829,38 +536,19 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ko#nalt>
   const FontFeature.notationalForms([this.value = 1]) : feature = 'nalt', assert(value >= 0);
 
-  // numr
   /// Display digits as numerators. (`numr`)
   ///
   /// This is typically used automatically by the font rendering
   /// system as part of the implementation of `frac` for the numerator
   /// part of fractions (see [FontFeature.fractions]).
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Piazzolla font supports the `numr` feature. It causes
   /// the digits to be rendered smaller and near the top of the EM box.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Piazzolla font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'Fractions: 1/2 2/3 3/4 4/5',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Piazzolla',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.numerators(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_numr.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_numerators.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -868,8 +556,7 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ko#numr>
   const FontFeature.numerators() : feature = 'numr', value = 1;
 
-  // onum
-  /// Use oldstyle figures. (`onum`)
+  /// Use old style figures. (`onum`)
   ///
   /// Some fonts have variants of the figures (e.g. the digit 9) that,
   /// when this feature is enabled, render with descenders under the
@@ -881,31 +568,13 @@ class FontFeature {
   /// This overrides [FontFeature.slashedZero] and may conflict with
   /// [FontFeature.liningFigures].
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Piazzolla font supports the `onum` feature. It causes
   /// digits to extend below the baseline.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Piazzolla font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'Call 311-555-2368 now!',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Piazzolla',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.oldstyleFigures(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_onum.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_oldstyle_figures.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -914,7 +583,6 @@ class FontFeature {
   ///  * <https://en.wikipedia.org/wiki/Text_figures>
   const FontFeature.oldstyleFigures() : feature = 'onum', value = 1;
 
-  // ordn
   /// Use ordinal forms for alphabetic glyphs. (`ordn`)
   ///
   /// Some fonts have variants of the alphabetic glyphs intended for
@@ -923,31 +591,13 @@ class FontFeature {
   ///
   /// This may override other features that substitute glyphs.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Piazzolla font supports the `ordn` feature. It causes
   /// alphabetic glyphs to become smaller and superscripted.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Piazzolla font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     '1st, 2nd, 3rd, 4th...',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Piazzolla',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.ordinalForms(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_ordn.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_ordinal_forms.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -955,7 +605,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ko#ordn>
   const FontFeature.ordinalForms() : feature = 'ordn', value = 1;
 
-  // pnum
   /// Use proportional (varying width) figures. (`pnum`)
   ///
   /// For fonts that have both proportional and tabular (monospace) figures,
@@ -965,8 +614,7 @@ class FontFeature {
   ///
   /// The default behavior varies from font to font.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Kufam font supports the `pnum` feature. It causes the digits
   /// to become proportionally-sized, rather than all being the same
   /// width. In this font this is especially noticeable with the digit
@@ -974,26 +622,9 @@ class FontFeature {
   /// sans-serif font, but with the proportionally figures enabled,
   /// the digit becomes much narrower.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Kufam font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'Call 311-555-2368 now!',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Kufam',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.proportionalFigures(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_pnum.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_proportional_figures.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -1001,7 +632,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_pt#pnum>
   const FontFeature.proportionalFigures() : feature = 'pnum', value = 1;
 
-  // rand
   /// Randomize the alternate forms used in text. (`rand`)
   ///
   /// For example, this can be used with suitably-prepared handwriting fonts to
@@ -1018,7 +648,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_pt#rand>
   const FontFeature.randomize() : feature = 'rand', value = 1;
 
-  // salt
   /// Enable stylistic alternates. (`salt`)
   ///
   /// Some fonts have alternative forms that are not tied to a
@@ -1028,8 +657,7 @@ class FontFeature {
   ///
   /// This may override other features that substitute glyphs.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Source Code Pro font supports the `salt` feature. It causes
   /// some glyphs to be rendered differently, for example the "a" and
   /// "g" glyphs change from their typographically common
@@ -1038,26 +666,9 @@ class FontFeature {
   /// angled), and the "0" rendering changes from a center dot to a
   /// slash.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Source Code Pro font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     r'Agile Game - $100 initial bet',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Source Code Pro',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.stylisticAlternates(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_salt.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_stylistic_alternates.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -1066,7 +677,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_pt#salt>
   const FontFeature.stylisticAlternates() : feature = 'salt', value = 1;
 
-  // sinf
   /// Use scientific inferiors. (`sinf`)
   ///
   /// Some fonts have variants of the figures (e.g. the digit 2) that,
@@ -1076,31 +686,13 @@ class FontFeature {
   ///
   /// This may override other features that substitute glyphs.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Piazzolla font supports the `sinf` feature. It causes
   /// digits to be smaller and subscripted.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Piazzolla font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'C8H10N4O2',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Piazzolla',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.scientificInferiors(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_sinf.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_scientific_inferiors.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -1108,7 +700,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_pt#sinf>
   const FontFeature.scientificInferiors() : feature = 'sinf', value = 1;
 
-  // ssXX
   /// Select a stylistic set. (`ss01` through `ss20`)
   ///
   /// Fonts may have up to 20 stylistic sets, numbered 1 through 20,
@@ -1118,8 +709,7 @@ class FontFeature {
   /// character variants can also be controlled by the
   /// [FontFeature.characterVariant] feature (`cvXX`).
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Source Code Pro font supports the `ssXX` feature for several
   /// sets. In the example below, stylistic sets 2 (`ss02`), 3
   /// (`ss03`), and 4 (`ss04`) are selected. Stylistic set 2 changes
@@ -1131,60 +721,22 @@ class FontFeature {
   /// This font also supports character variants (see
   /// [FontFeature.characterVariant]).
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Source Code Pro font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return Text(
-  ///     'aáâ β gǵĝ θб Iiíî Ll',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Source Code Pro',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.stylisticSet(2),
-  ///         FontFeature.stylisticSet(3),
-  ///         FontFeature.stylisticSet(4),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_ssXX_1.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_stylistic_set.0.dart **
   /// {@end-tool}
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
-  /// The Piazzolla font supports the `ssXX` feature for for more
+  /// {@tool sample}
+  /// The Piazzolla font supports the `ssXX` feature for more
   /// elaborate stylistic effects. Set 1 turns some Latin characters
   /// into Roman numerals, set 2 enables some ASCII characters to be
   /// used to create pretty arrows, and so forth.
   ///
   /// _These_ stylistic sets do _not_ correspond to character variants.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Piazzolla font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return Text(
-  ///     '-> MCMXCVII <-', // 1997
-  ///     style: TextStyle(
-  ///       fontFamily: 'Piazzolla',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.stylisticSet(1),
-  ///         FontFeature.stylisticSet(2),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_ssXX_2.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_stylistic_set.1.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -1198,7 +750,6 @@ class FontFeature {
     return FontFeature('ss${value.toString().padLeft(2, "0")}');
   }
 
-  // subs
   /// Enable subscripts. (`subs`)
   ///
   /// This feature causes some fonts to change some glyphs to their subscripted form.
@@ -1208,31 +759,13 @@ class FontFeature {
   ///
   /// This may override other features that substitute glyphs.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Piazzolla font supports the `subs` feature. It causes
   /// digits to be smaller and subscripted.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Piazzolla font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'Line from x1,y1 to x2,y2',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Piazzolla',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.subscripts(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_subs.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_subscripts.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -1243,7 +776,6 @@ class FontFeature {
   ///  * [FontFeature.superscripts], which is similar but for subscripting.
   const FontFeature.subscripts() : feature = 'subs', value = 1;
 
-  // sups
   /// Enable superscripts. (`sups`)
   ///
   /// This feature causes some fonts to change some glyphs to their
@@ -1257,32 +789,14 @@ class FontFeature {
   ///
   /// This may override other features that substitute glyphs.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Sorts Mill Goudy font supports the `sups` feature. It causes
   /// digits to be smaller, superscripted, and changes them to lining
   /// figures (so they are all the same height).
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Sorts Mill Goudy font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'The isotope 238U decays to 206Pb',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Sorts Mill Goudy',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.superscripts(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_sups.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_superscripts.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -1291,7 +805,6 @@ class FontFeature {
   ///  * [FontFeature.subscripts], which is similar but for subscripting.
   const FontFeature.superscripts() : feature = 'sups', value = 1;
 
-  // swsh
   /// Enable swash glyphs. (`swsh`)
   ///
   /// Some fonts have beautiful flourishes on some characters. These
@@ -1308,31 +821,13 @@ class FontFeature {
   /// example, Adobe's Poetica famously has 63 different ampersand
   /// forms available through this feature!
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The BioRhyme Expanded font supports the `swsh` feature specifically
   /// for the capital "Q" and "R" glyphs and the ampersand.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The BioRhyme Expanded font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'Queer & Romantic',
-  ///     style: TextStyle(
-  ///       fontFamily: 'BioRhyme Expanded',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.swash(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_swsh.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_swash.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -1341,7 +836,6 @@ class FontFeature {
   ///  * <https://en.wikipedia.org/wiki/Swash_(typography)>
   const FontFeature.swash([this.value = 1]) : feature = 'swsh', assert(value >= 0);
 
-  // tnum
   /// Use tabular (monospace) figures. (`tnum`)
   ///
   /// For fonts that have both proportional (varying width) and tabular figures,
@@ -1352,34 +846,16 @@ class FontFeature {
   ///
   /// The default behavior varies from font to font.
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Piazzolla font supports the `tnum` feature. It causes the
-  /// digits to become uniformally-sized, rather than having variable
+  /// digits to become uniformly-sized, rather than having variable
   /// widths. In this font this is especially noticeable with the
   /// digit "1"; with tabular figures enabled, the "1" digit is more
   /// widely spaced.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Piazzolla font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'Call 311-555-2368 now!',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Piazzolla',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.tabularFigures(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_tnum.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_tabular_figures.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -1387,7 +863,6 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_pt#tnum>
   const FontFeature.tabularFigures() : feature = 'tnum', value = 1;
 
-  // zero
   /// Use the slashed zero. (`zero`)
   ///
   /// Some fonts contain both a circular zero and a zero with a slash. This
@@ -1395,32 +870,14 @@ class FontFeature {
   ///
   /// This is overridden by [FontFeature.oldstyleFigures].
   ///
-  /// {@tool sample --template=stateless_widget}
-  ///
+  /// {@tool sample}
   /// The Source Code Pro font supports the `zero` feature. It causes the
   /// zero digit to be drawn with a slash rather than the default rendering,
   /// which in this case has a dot through the zero rather than a slash.
   ///
-  /// ```dart dartImports
-  /// import 'dart:ui';
-  /// ```
-  ///
-  /// ```dart
-  /// Widget build(BuildContext context) {
-  ///   // The Source Code Pro font can be downloaded from Google Fonts (https://www.google.com/fonts).
-  ///   return const Text(
-  ///     'One million is: 1,000,000.00',
-  ///     style: TextStyle(
-  ///       fontFamily: 'Source Code Pro',
-  ///       fontFeatures: <FontFeature>[
-  ///         FontFeature.slashedZero(),
-  ///       ],
-  ///     ),
-  ///   );
-  /// }
-  /// ```
-  ///
   /// ![](https://flutter.github.io/assets-for-api-docs/assets/dart-ui/font_feature_zero.png)
+  ///
+  /// ** See code in examples/api/lib/ui/text/font_feature.font_feature_slashed_zero.0.dart **
   /// {@end-tool}
   ///
   /// See also:
@@ -1464,18 +921,81 @@ class FontFeature {
 
   @override
   bool operator ==(Object other) {
-    if (other.runtimeType != runtimeType)
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is FontFeature
         && other.feature == feature
         && other.value == value;
   }
 
   @override
-  int get hashCode => hashValues(feature, value);
+  int get hashCode => Object.hash(feature, value);
 
   @override
   String toString() => "FontFeature('$feature', $value)";
+}
+
+/// An axis tag and value that can be used to customize variable fonts.
+///
+/// Some fonts are variable fonts that can generate a range of different
+/// font faces by altering the values of the font's design axes.
+///
+/// See https://docs.microsoft.com/en-us/typography/opentype/spec/otvaroverview
+///
+/// Example:
+/// `TextStyle(fontVariations: <FontVariation>[FontVariation('wght', 800.0)])`
+class FontVariation {
+  /// Creates a [FontVariation] object, which can be added to a [TextStyle] to
+  /// change the variable attributes of a font.
+  ///
+  /// `axis` is the four-character tag that identifies the design axis.
+  /// These tags are specified by font formats such as OpenType.
+  /// See https://docs.microsoft.com/en-us/typography/opentype/spec/dvaraxisreg
+  ///
+  /// `value` is the value that the axis will be set to. The behavior
+  /// depends on how the font implements the axis.
+  const FontVariation(
+    this.axis,
+    this.value,
+  ) : assert(axis != null),
+      assert(axis.length == 4, 'Axis tag must be exactly four characters long.'),
+      assert(value != null);
+
+  /// The tag that identifies the design axis.  Must consist of 4 ASCII
+  /// characters.
+  final String axis;
+
+  /// The value assigned to this design axis.
+  ///
+  /// The range of usable values depends on the specification of the axis.
+  final double value;
+
+  static const int _kEncodedSize = 8;
+
+  void _encode(ByteData byteData) {
+    assert(axis.codeUnits.every((int c) => c >= 0x20 && c <= 0x7F));
+    for (int i = 0; i < 4; i++) {
+      byteData.setUint8(i, axis.codeUnitAt(i));
+    }
+    byteData.setFloat32(4, value, _kFakeHostEndian);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (other.runtimeType != runtimeType) {
+      return false;
+    }
+    return other is FontVariation
+        && other.axis == axis
+        && other.value == value;
+  }
+
+  @override
+  int get hashCode => Object.hash(axis, value);
+
+  @override
+  String toString() => "FontVariation('$axis', $value)";
 }
 
 /// Whether and how to align text horizontally.
@@ -1527,8 +1047,9 @@ class TextDecoration {
   /// Creates a decoration that paints the union of all the given decorations.
   factory TextDecoration.combine(List<TextDecoration> decorations) {
     int mask = 0;
-    for (final TextDecoration decoration in decorations)
+    for (final TextDecoration decoration in decorations) {
       mask |= decoration._mask;
+    }
     return TextDecoration._(mask);
   }
 
@@ -1562,17 +1083,22 @@ class TextDecoration {
 
   @override
   String toString() {
-    if (_mask == 0)
+    if (_mask == 0) {
       return 'TextDecoration.none';
+    }
     final List<String> values = <String>[];
-    if (_mask & underline._mask != 0)
+    if (_mask & underline._mask != 0) {
       values.add('underline');
-    if (_mask & overline._mask != 0)
+    }
+    if (_mask & overline._mask != 0) {
       values.add('overline');
-    if (_mask & lineThrough._mask != 0)
+    }
+    if (_mask & lineThrough._mask != 0) {
       values.add('lineThrough');
-    if (values.length == 1)
+    }
+    if (values.length == 1) {
       return 'TextDecoration.${values[0]}';
+    }
     return 'TextDecoration.combine([${values.join(", ")}])';
   }
 }
@@ -1599,7 +1125,7 @@ enum TextDecorationStyle {
 enum TextLeadingDistribution {
   /// Distributes the [leading](https://en.wikipedia.org/wiki/Leading)
   /// of the text proportionally above and below the text, to the font's
-  /// ascent/discent ratio.
+  /// ascent/descent ratio.
   ///
   /// {@template dart.ui.leading}
   /// The leading of a text run is defined as
@@ -1626,14 +1152,16 @@ enum TextLeadingDistribution {
 /// {@template dart.ui.textHeightBehavior}
 /// Defines how to apply [TextStyle.height] over and under text.
 ///
-/// [applyHeightToFirstAscent] and [applyHeightToLastDescent] represent whether
-/// the [TextStyle.height] modifier will be applied to the corresponding metric.
-/// By default both properties are true, and [TextStyle.height] is applied as
+/// [TextHeightBehavior.applyHeightToFirstAscent] and
+/// [TextHeightBehavior.applyHeightToLastDescent] represent whether the
+/// [TextStyle.height] modifier will be applied to the corresponding metric. By
+/// default both properties are true, and [TextStyle.height] is applied as
 /// normal. When set to false, the font's default ascent will be used.
 ///
-/// [leadingDistribution] determines how the [leading] is distributed over and
-/// under text. This property applies before [applyHeightToFirstAscent] and
-/// [applyHeightToLastDescent].
+/// [TextHeightBehavior.leadingDistribution] determines how the
+/// leading is distributed over and under text. This
+/// property applies before [TextHeightBehavior.applyHeightToFirstAscent] and
+/// [TextHeightBehavior.applyHeightToLastDescent].
 ///
 /// {@endtemplate}
 class TextHeightBehavior {
@@ -1646,7 +1174,7 @@ class TextHeightBehavior {
   ///  * applyHeightToLastDescent: When true, the [TextStyle.height] modifier
   ///    will be applied to the descent of the last line. When false, the font's
   ///    default descent will be used.
-  ///  * leadingDistribution: How the [leading] is distributed over and under
+  ///  * leadingDistribution: How the leading is distributed over and under
   ///    text.
   ///
   /// All properties default to true (height modifications applied as normal).
@@ -1708,8 +1236,9 @@ class TextHeightBehavior {
 
   @override
   bool operator ==(Object other) {
-    if (other.runtimeType != runtimeType)
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is TextHeightBehavior
         && other.applyHeightToFirstAscent == applyHeightToFirstAscent
         && other.applyHeightToLastDescent == applyHeightToLastDescent
@@ -1718,7 +1247,7 @@ class TextHeightBehavior {
 
   @override
   int get hashCode {
-    return hashValues(
+    return Object.hash(
       applyHeightToFirstAscent,
       applyHeightToLastDescent,
       leadingDistribution.index,
@@ -1741,13 +1270,16 @@ class TextHeightBehavior {
 /// the same length, and contain the same elements in the same order. Returns
 /// false otherwise.
 bool _listEquals<T>(List<T>? a, List<T>? b) {
-  if (a == null)
+  if (a == null) {
     return b == null;
-  if (b == null || a.length != b.length)
+  }
+  if (b == null || a.length != b.length) {
     return false;
+  }
   for (int index = 0; index < a.length; index += 1) {
-    if (a[index] != b[index])
+    if (a[index] != b[index]) {
       return false;
+    }
   }
   return true;
 }
@@ -1798,6 +1330,7 @@ Int32List _encodeTextStyle(
   Paint? foreground,
   List<Shadow>? shadows,
   List<FontFeature>? fontFeatures,
+  List<FontVariation>? fontVariations,
 ) {
   final Int32List result = Int32List(9);
   // The 0th bit of result[0] is reserved for leadingDistribution.
@@ -1873,6 +1406,10 @@ Int32List _encodeTextStyle(
     result[0] |= 1 << 18;
     // Passed separately to native.
   }
+  if (fontVariations != null) {
+    result[0] |= 1 << 19;
+    // Passed separately to native.
+  }
 
   return result;
 }
@@ -1890,7 +1427,7 @@ class TextStyle {
   /// * `decoration`: The decorations to paint near the text (e.g., an underline).
   /// * `decorationColor`: The color in which to paint the text decorations.
   /// * `decorationStyle`: The style in which to paint the text decorations (e.g., dashed).
-  /// * `decorationThickness`: The thickness of the decoration as a muliplier on the thickness specified by the font.
+  /// * `decorationThickness`: The thickness of the decoration as a multiplier on the thickness specified by the font.
   /// * `fontWeight`: The typeface thickness to use when painting the text (e.g., bold).
   /// * `fontStyle`: The typeface variant to use when drawing the letters (e.g., italics).
   /// * `fontFamily`: The name of the font to use when painting the text (e.g., Roboto). If a `fontFamilyFallback` is
@@ -1914,6 +1451,7 @@ class TextStyle {
   /// * `background`: The paint drawn as a background for the text.
   /// * `foreground`: The paint used to draw the text. If this is specified, `color` must be null.
   /// * `fontFeatures`: The font features that should be applied to the text.
+  /// * `fontVariations`: The font variations that should be applied to the text.
   TextStyle({
     Color? color,
     TextDecoration? decoration,
@@ -1935,6 +1473,7 @@ class TextStyle {
     Paint? foreground,
     List<Shadow>? shadows,
     List<FontFeature>? fontFeatures,
+    List<FontVariation>? fontVariations,
   }) : assert(color == null || foreground == null,
          'Cannot provide both a color and a foreground\n'
          'The color argument is just a shorthand for "foreground: Paint()..color = color".'
@@ -1959,6 +1498,7 @@ class TextStyle {
          foreground,
          shadows,
          fontFeatures,
+         fontVariations,
        ),
        _leadingDistribution = leadingDistribution,
        _fontFamily = fontFamily ?? '',
@@ -1972,7 +1512,8 @@ class TextStyle {
        _background = background,
        _foreground = foreground,
        _shadows = shadows,
-       _fontFeatures = fontFeatures;
+       _fontFeatures = fontFeatures,
+       _fontVariations = fontVariations;
 
   final Int32List _encoded;
   final String _fontFamily;
@@ -1987,12 +1528,14 @@ class TextStyle {
   final Paint? _foreground;
   final List<Shadow>? _shadows;
   final List<FontFeature>? _fontFeatures;
+  final List<FontVariation>? _fontVariations;
   final TextLeadingDistribution? _leadingDistribution;
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other))
+    if (identical(this, other)) {
       return true;
+    }
     return other is TextStyle
         && other._leadingDistribution == _leadingDistribution
         && other._fontFamily == _fontFamily
@@ -2007,11 +1550,28 @@ class TextStyle {
         && _listEquals<int>(other._encoded, _encoded)
         && _listEquals<Shadow>(other._shadows, _shadows)
         && _listEquals<String>(other._fontFamilyFallback, _fontFamilyFallback)
-        && _listEquals<FontFeature>(other._fontFeatures, _fontFeatures);
+        && _listEquals<FontFeature>(other._fontFeatures, _fontFeatures)
+        && _listEquals<FontVariation>(other._fontVariations, _fontVariations);
   }
 
   @override
-  int get hashCode => hashValues(hashList(_encoded), _leadingDistribution, _fontFamily, _fontFamilyFallback, _fontSize, _letterSpacing, _wordSpacing, _height, _locale, _background, _foreground, hashList(_shadows), _decorationThickness, hashList(_fontFeatures));
+  int get hashCode => Object.hash(
+    Object.hashAll(_encoded),
+    _leadingDistribution,
+    _fontFamily,
+    _fontFamilyFallback,
+    _fontSize,
+    _letterSpacing,
+    _wordSpacing,
+    _height,
+    _locale,
+    _background,
+    _foreground,
+    _shadows == null ? null : Object.hashAll(_shadows!),
+    _decorationThickness,
+    _fontFeatures == null ? null : Object.hashAll(_fontFeatures!),
+    _fontVariations == null ? null : Object.hashAll(_fontVariations!),
+  );
 
   @override
   String toString() {
@@ -2039,7 +1599,8 @@ class TextStyle {
              'background: ${         _encoded[0] & 0x08000 == 0x08000  ? _background                                  : "unspecified"}, '
              'foreground: ${         _encoded[0] & 0x10000 == 0x10000  ? _foreground                                  : "unspecified"}, '
              'shadows: ${            _encoded[0] & 0x20000 == 0x20000  ? _shadows                                     : "unspecified"}, '
-             'fontFeatures: ${       _encoded[0] & 0x40000 == 0x40000  ? _fontFeatures                                : "unspecified"}'
+             'fontFeatures: ${       _encoded[0] & 0x40000 == 0x40000  ? _fontFeatures                                : "unspecified"}, '
+             'fontVariations: ${     _encoded[0] & 0x80000 == 0x80000  ? _fontVariations                              : "unspecified"}'
            ')';
   }
 }
@@ -2140,7 +1701,7 @@ class ParagraphStyle {
   ///   paragraph. If the last line is ellipsized (see `ellipsis` below), the
   ///   alignment is applied to that line after it has been truncated but before
   ///   the ellipsis has been added.
-   //   See: https://github.com/flutter/flutter/issues/9819
+  ///   See: https://github.com/flutter/flutter/issues/9819
   ///
   /// * `textDirection`: The directionality of the text, left-to-right (e.g.
   ///   Norwegian) or right-to-left (e.g. Hebrew). This controls the overall
@@ -2239,10 +1800,12 @@ class ParagraphStyle {
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other))
+    if (identical(this, other)) {
       return true;
-    if (other.runtimeType != runtimeType)
+    }
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is ParagraphStyle
         && other._fontFamily == _fontFamily
         && other._fontSize == _fontSize
@@ -2255,7 +1818,7 @@ class ParagraphStyle {
   }
 
   @override
-  int get hashCode => hashValues(hashList(_encoded), _fontFamily, _fontSize, _height, _ellipsis, _locale, _leadingDistribution);
+  int get hashCode => Object.hash(Object.hashAll(_encoded), _fontFamily, _fontSize, _height, _ellipsis, _locale, _leadingDistribution);
 
   @override
   String toString() {
@@ -2271,18 +1834,17 @@ class ParagraphStyle {
              'fontFamily: ${    _encoded[0] & 0x080 == 0x080 ? _fontFamily                       : "unspecified"}, '
              'fontSize: ${      _encoded[0] & 0x100 == 0x100 ? _fontSize                         : "unspecified"}, '
              'height: ${        _encoded[0] & 0x200 == 0x200 ? "${_height}x"                     : "unspecified"}, '
-             'ellipsis: ${      _encoded[0] & 0x400 == 0x400 ? "\"$_ellipsis\""                  : "unspecified"}, '
+             'ellipsis: ${      _encoded[0] & 0x400 == 0x400 ? '"$_ellipsis"'                    : "unspecified"}, '
              'locale: ${        _encoded[0] & 0x800 == 0x800 ? _locale                           : "unspecified"}'
            ')';
   }
 }
 
 // Serialize strut properties into ByteData. This encoding errs towards
-// compactness. The first 8 bits is a bitmask that records which properties
-// are null. The rest of the values are encoded in the same order encountered
-// in the bitmask. The final returned value truncates any unused bytes
-// at the end. For ease of decoding, all 8 bit ints are stored before any 32 bit
-// ints.
+// compactness. The first 8 bits is a bitmask that records which properties are
+// null. The rest of the values are encoded in the same order encountered in the
+// bitmask. The final returned value truncates any unused bytes at the end. For
+// ease of decoding, all 8 bit integers are stored before any 32 bit integers.
 //
 // We serialize this more thoroughly than ParagraphStyle because it is
 // much more likely that the strut is empty/null and we wish to add
@@ -2304,8 +1866,9 @@ ByteData _encodeStrut(
     leading == null &&
     fontWeight == null &&
     fontStyle == null &&
-    forceStrutHeight == null)
+    forceStrutHeight == null) {
     return ByteData(0);
+  }
 
   final ByteData data = ByteData(16); // Max size is 16 bytes
   int bitmask = 0; // 8 bit mask
@@ -2320,7 +1883,7 @@ ByteData _encodeStrut(
     data.setInt8(byteCount, fontStyle.index);
     byteCount += 1;
   }
-  if (fontFamily != null || (fontFamilyFallback != null && fontFamilyFallback.isNotEmpty)){
+  if (fontFamily != null || (fontFamilyFallback != null && fontFamilyFallback.isNotEmpty)) {
     bitmask |= 1 << 2;
     // passed separately to native
   }
@@ -2336,7 +1899,6 @@ ByteData _encodeStrut(
     bitmask |= 1 << 5;
     data.setFloat32(byteCount, height, _kFakeHostEndian);
     byteCount += 4;
-
   }
   if (leading != null) {
     bitmask |= 1 << 6;
@@ -2351,7 +1913,7 @@ ByteData _encodeStrut(
 
   assert(byteCount <= 16);
   assert(bitmask >> 8 == 0, 'strut bitmask overflow: $bitmask');
-  return ByteData.view(data.buffer, 0,  byteCount);
+  return ByteData.view(data.buffer, 0, byteCount);
 }
 
 /// See also:
@@ -2438,10 +2000,12 @@ class StrutStyle {
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other))
+    if (identical(this, other)) {
       return true;
-    if (other.runtimeType != runtimeType)
+    }
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is StrutStyle
         && other._fontFamily == _fontFamily
         && other._leadingDistribution == _leadingDistribution
@@ -2450,7 +2014,7 @@ class StrutStyle {
   }
 
   @override
-  int get hashCode => hashValues(hashList(_encoded.buffer.asInt8List()), _fontFamily, _leadingDistribution);
+  int get hashCode => Object.hash(Object.hashAll(_encoded.buffer.asInt8List()), _fontFamily, _leadingDistribution);
 
 }
 
@@ -2603,10 +2167,12 @@ class TextBox {
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other))
+    if (identical(this, other)) {
       return true;
-    if (other.runtimeType != runtimeType)
+    }
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is TextBox
         && other.left == left
         && other.top == top
@@ -2616,7 +2182,7 @@ class TextBox {
   }
 
   @override
-  int get hashCode => hashValues(left, top, right, bottom, direction);
+  int get hashCode => Object.hash(left, top, right, bottom, direction);
 
   @override
   String toString() => 'TextBox.fromLTRBD(${left.toStringAsFixed(1)}, ${top.toStringAsFixed(1)}, ${right.toStringAsFixed(1)}, ${bottom.toStringAsFixed(1)}, $direction)';
@@ -2715,15 +2281,16 @@ class TextPosition {
 
   @override
   bool operator ==(Object other) {
-    if (other.runtimeType != runtimeType)
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is TextPosition
         && other.offset == offset
         && other.affinity == affinity;
   }
 
   @override
-  int get hashCode => hashValues(offset, affinity);
+  int get hashCode => Object.hash(offset, affinity);
 
   @override
   String toString() {
@@ -2747,7 +2314,7 @@ class TextRange {
     required this.start,
     required this.end,
   }) : assert(start != null && start >= -1),
-        assert(end != null && end >= -1);
+       assert(end != null && end >= -1);
 
   /// A text range that starts and ends at offset.
   ///
@@ -2799,15 +2366,16 @@ class TextRange {
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other))
+    if (identical(this, other)) {
       return true;
+    }
     return other is TextRange
         && other.start == start
         && other.end == end;
   }
 
   @override
-  int get hashCode => hashValues(
+  int get hashCode => Object.hash(
     start.hashCode,
     end.hashCode,
   );
@@ -2842,7 +2410,7 @@ class ParagraphConstraints {
   /// follows).
   ///
   /// The width influences how ellipses are applied. See the discussion at
-  /// [new ParagraphStyle] for more details.
+  /// [ParagraphStyle.new] for more details.
   ///
   /// This width is also used to position glyphs according to the [TextAlign]
   /// alignment described in the [ParagraphStyle] used when building the
@@ -2851,8 +2419,9 @@ class ParagraphConstraints {
 
   @override
   bool operator ==(Object other) {
-    if (other.runtimeType != runtimeType)
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is ParagraphConstraints
         && other.width == width;
   }
@@ -3090,7 +2659,7 @@ class LineMetrics {
   }
 
   @override
-  int get hashCode => hashValues(hardBreak, ascent, descent, unscaledAscent, height, width, left, baseline, lineNumber);
+  int get hashCode => Object.hash(hardBreak, ascent, descent, unscaledAscent, height, width, left, baseline, lineNumber);
 
   @override
   String toString() {
@@ -3124,41 +2693,50 @@ class Paragraph extends NativeFieldWrapperClass1 {
   @pragma('vm:entry-point')
   Paragraph._();
 
+  bool _needsLayout = true;
+
   /// The amount of horizontal space this paragraph occupies.
   ///
   /// Valid only after [layout] has been called.
-  double get width native 'Paragraph_width';
+  @FfiNative<Double Function(Pointer<Void>)>('Paragraph::width', isLeaf: true)
+  external double get width;
 
   /// The amount of vertical space this paragraph occupies.
   ///
   /// Valid only after [layout] has been called.
-  double get height native 'Paragraph_height';
+  @FfiNative<Double Function(Pointer<Void>)>('Paragraph::height', isLeaf: true)
+  external double get height;
 
   /// The distance from the left edge of the leftmost glyph to the right edge of
   /// the rightmost glyph in the paragraph.
   ///
   /// Valid only after [layout] has been called.
-  double get longestLine native 'Paragraph_longestLine';
+  @FfiNative<Double Function(Pointer<Void>)>('Paragraph::longestLine', isLeaf: true)
+  external double get longestLine;
 
   /// The minimum width that this paragraph could be without failing to paint
   /// its contents within itself.
   ///
   /// Valid only after [layout] has been called.
-  double get minIntrinsicWidth native 'Paragraph_minIntrinsicWidth';
+  @FfiNative<Double Function(Pointer<Void>)>('Paragraph::minIntrinsicWidth', isLeaf: true)
+  external double get minIntrinsicWidth;
 
   /// Returns the smallest width beyond which increasing the width never
   /// decreases the height.
   ///
   /// Valid only after [layout] has been called.
-  double get maxIntrinsicWidth native 'Paragraph_maxIntrinsicWidth';
+  @FfiNative<Double Function(Pointer<Void>)>('Paragraph::maxIntrinsicWidth', isLeaf: true)
+  external double get maxIntrinsicWidth;
 
   /// The distance from the top of the paragraph to the alphabetic
   /// baseline of the first line, in logical pixels.
-  double get alphabeticBaseline native 'Paragraph_alphabeticBaseline';
+  @FfiNative<Double Function(Pointer<Void>)>('Paragraph::alphabeticBaseline', isLeaf: true)
+  external double get alphabeticBaseline;
 
   /// The distance from the top of the paragraph to the ideographic
   /// baseline of the first line, in logical pixels.
-  double get ideographicBaseline native 'Paragraph_ideographicBaseline';
+  @FfiNative<Double Function(Pointer<Void>)>('Paragraph::ideographicBaseline', isLeaf: true)
+  external double get ideographicBaseline;
 
   /// True if there is more vertical content, but the text was truncated, either
   /// because we reached `maxLines` lines of text or because the `maxLines` was
@@ -3166,14 +2744,22 @@ class Paragraph extends NativeFieldWrapperClass1 {
   /// constraint.
   ///
   /// See the discussion of the `maxLines` and `ellipsis` arguments at
-  /// [new ParagraphStyle].
-  bool get didExceedMaxLines native 'Paragraph_didExceedMaxLines';
+  /// [ParagraphStyle.new].
+  @FfiNative<Bool Function(Pointer<Void>)>('Paragraph::didExceedMaxLines', isLeaf: true)
+  external bool get didExceedMaxLines;
 
   /// Computes the size and position of each glyph in the paragraph.
   ///
   /// The [ParagraphConstraints] control how wide the text is allowed to be.
-  void layout(ParagraphConstraints constraints) => _layout(constraints.width);
-  void _layout(double width) native 'Paragraph_layout';
+  void layout(ParagraphConstraints constraints) {
+    _layout(constraints.width);
+    assert(() {
+      _needsLayout = false;
+      return true;
+    }());
+  }
+  @FfiNative<Void Function(Pointer<Void>, Double)>('Paragraph::layout', isLeaf: true)
+  external void _layout(double width);
 
   List<TextBox> _decodeTextBoxes(Float32List encoded) {
     final int count = encoded.length ~/ 5;
@@ -3209,8 +2795,10 @@ class Paragraph extends NativeFieldWrapperClass1 {
     assert(boxWidthStyle != null);
     return _decodeTextBoxes(_getBoxesForRange(start, end, boxHeightStyle.index, boxWidthStyle.index));
   }
+
   // See paragraph.cc for the layout of this return value.
-  Float32List _getBoxesForRange(int start, int end, int boxHeightStyle, int boxWidthStyle) native 'Paragraph_getRectsForRange';
+  @FfiNative<Handle Function(Pointer<Void>, Uint32, Uint32, Uint32, Uint32)>('Paragraph::getRectsForRange')
+  external Float32List _getBoxesForRange(int start, int end, int boxHeightStyle, int boxWidthStyle);
 
   /// Returns a list of text boxes that enclose all placeholders in the paragraph.
   ///
@@ -3222,14 +2810,18 @@ class Paragraph extends NativeFieldWrapperClass1 {
   List<TextBox> getBoxesForPlaceholders() {
     return _decodeTextBoxes(_getBoxesForPlaceholders());
   }
-  Float32List _getBoxesForPlaceholders() native 'Paragraph_getRectsForPlaceholders';
+
+  @FfiNative<Handle Function(Pointer<Void>)>('Paragraph::getRectsForPlaceholders')
+  external Float32List _getBoxesForPlaceholders();
 
   /// Returns the text position closest to the given offset.
   TextPosition getPositionForOffset(Offset offset) {
     final List<int> encoded = _getPositionForOffset(offset.dx, offset.dy);
     return TextPosition(offset: encoded[0], affinity: TextAffinity.values[encoded[1]]);
   }
-  List<int> _getPositionForOffset(double dx, double dy) native 'Paragraph_getPositionForOffset';
+
+  @FfiNative<Handle Function(Pointer<Void>, Double, Double)>('Paragraph::getPositionForOffset')
+  external List<int> _getPositionForOffset(double dx, double dy);
 
   /// Returns the [TextRange] of the word at the given [TextPosition].
   ///
@@ -3241,7 +2833,9 @@ class Paragraph extends NativeFieldWrapperClass1 {
     final List<int> boundary = _getWordBoundary(position.offset);
     return TextRange(start: boundary[0], end: boundary[1]);
   }
-  List<int> _getWordBoundary(int offset) native 'Paragraph_getWordBoundary';
+
+  @FfiNative<Handle Function(Pointer<Void>, Uint32)>('Paragraph::getWordBoundary')
+  external List<int> _getWordBoundary(int offset);
 
   /// Returns the [TextRange] of the line at the given [TextPosition].
   ///
@@ -3265,7 +2859,7 @@ class Paragraph extends NativeFieldWrapperClass1 {
 
     // _getLineBoundary only considers the offset and assumes that the
     // TextAffinity is upstream. In the case that TextPosition is just after a
-    // wordwrap (downstream), we need to return the line for the next offset.
+    // word wrap (downstream), we need to return the line for the next offset.
     if (position.affinity == TextAffinity.downstream && line != nextLine
         && position.offset == line.end && line.end == nextLine.start) {
       final List<int> nextBoundary = _getLineBoundary(position.offset + 1);
@@ -3273,12 +2867,15 @@ class Paragraph extends NativeFieldWrapperClass1 {
     }
     return line;
   }
-  List<int> _getLineBoundary(int offset) native 'Paragraph_getLineBoundary';
+
+  @FfiNative<Handle Function(Pointer<Void>, Uint32)>('Paragraph::getLineBoundary')
+  external List<int> _getLineBoundary(int offset);
 
   // Redirecting the paint function in this way solves some dependency problems
   // in the C++ code. If we straighten out the C++ dependencies, we can remove
   // this indirection.
-  void _paint(Canvas canvas, double x, double y) native 'Paragraph_paint';
+  @FfiNative<Void Function(Pointer<Void>, Pointer<Void>, Double, Double)>('Paragraph::paint')
+  external void _paint(Canvas canvas, double x, double y);
 
   /// Returns the full list of [LineMetrics] that describe in detail the various
   /// metrics of each laid out line.
@@ -3307,14 +2904,16 @@ class Paragraph extends NativeFieldWrapperClass1 {
     ];
     return metrics;
   }
-  Float64List _computeLineMetrics() native 'Paragraph_computeLineMetrics';
+
+  @FfiNative<Handle Function(Pointer<Void>)>('Paragraph::computeLineMetrics')
+  external Float64List _computeLineMetrics();
 }
 
 /// Builds a [Paragraph] containing text with the given styling information.
 ///
 /// To set the paragraph's alignment, truncation, and ellipsizing behavior, pass
 /// an appropriately-configured [ParagraphStyle] object to the
-/// [new ParagraphBuilder] constructor.
+/// [ParagraphBuilder.new] constructor.
 ///
 /// Then, call combinations of [pushStyle], [addText], and [pop] to add styled
 /// text to the object.
@@ -3354,25 +2953,25 @@ class ParagraphBuilder extends NativeFieldWrapperClass1 {
       _constructor(
         style._encoded,
         encodedStrutStyle,
-        style._fontFamily,
+        style._fontFamily ?? '',
         strutFontFamilies,
-        style._fontSize,
-        style._height,
-        style._ellipsis,
+        style._fontSize ?? 0,
+        style._height ?? 0,
+        style._ellipsis ?? '',
         _encodeLocale(style._locale)
       );
   }
 
-  void _constructor(
-    Int32List encoded,
-    ByteData? strutData,
-    String? fontFamily,
-    List<dynamic>? strutFontFamily,
-    double? fontSize,
-    double? height,
-    String? ellipsis,
-    String locale
-  ) native 'ParagraphBuilder_constructor';
+  @FfiNative<Void Function(Handle, Handle, Handle, Handle, Handle, Double, Double, Handle, Handle)>('ParagraphBuilder::Create')
+  external void _constructor(
+      Int32List encoded,
+      ByteData? strutData,
+      String fontFamily,
+      List<Object?>? strutFontFamily,
+      double fontSize,
+      double height,
+      String ellipsis,
+      String locale);
 
   /// The number of placeholders currently in the paragraph.
   int get placeholderCount => _placeholderCount;
@@ -3380,7 +2979,7 @@ class ParagraphBuilder extends NativeFieldWrapperClass1 {
 
   /// The scales of the placeholders in the paragraph.
   List<double> get placeholderScales => _placeholderScales;
-  List<double> _placeholderScales = <double>[];
+  final List<double> _placeholderScales = <double>[];
 
   final TextLeadingDistribution _defaultLeadingDistribution;
   /// Applies the given style to the added text until [pop] is called.
@@ -3389,8 +2988,9 @@ class ParagraphBuilder extends NativeFieldWrapperClass1 {
   void pushStyle(TextStyle style) {
     final List<String> fullFontFamilies = <String>[];
     fullFontFamilies.add(style._fontFamily);
-    if (style._fontFamilyFallback != null)
+    if (style._fontFamilyFallback != null) {
       fullFontFamilies.addAll(style._fontFamilyFallback!);
+    }
 
     final Int32List encoded = style._encoded;
     final TextLeadingDistribution finalLeadingDistribution = style._leadingDistribution ?? _defaultLeadingDistribution;
@@ -3412,14 +3012,25 @@ class ParagraphBuilder extends NativeFieldWrapperClass1 {
       }
     }
 
+    ByteData? encodedFontVariations;
+    final List<FontVariation>? fontVariations = style._fontVariations;
+    if (fontVariations != null) {
+      encodedFontVariations = ByteData(fontVariations.length * FontVariation._kEncodedSize);
+      int byteOffset = 0;
+      for (final FontVariation variation in fontVariations) {
+        variation._encode(ByteData.view(encodedFontVariations.buffer, byteOffset, FontVariation._kEncodedSize));
+        byteOffset += FontVariation._kEncodedSize;
+      }
+    }
+
     _pushStyle(
       encoded,
       fullFontFamilies,
-      style._fontSize,
-      style._letterSpacing,
-      style._wordSpacing,
-      style._height,
-      style._decorationThickness,
+      style._fontSize ?? 0,
+      style._letterSpacing ?? 0,
+      style._wordSpacing ?? 0,
+      style._height ?? 0,
+      style._decorationThickness ?? 0,
       _encodeLocale(style._locale),
       style._background?._objects,
       style._background?._data,
@@ -3427,25 +3038,45 @@ class ParagraphBuilder extends NativeFieldWrapperClass1 {
       style._foreground?._data,
       Shadow._encodeShadows(style._shadows),
       encodedFontFeatures,
+      encodedFontVariations,
     );
   }
 
-  void _pushStyle(
+  @FfiNative<
+      Void Function(
+          Pointer<Void>,
+          Handle,
+          Handle,
+          Double,
+          Double,
+          Double,
+          Double,
+          Double,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle,
+          Handle)>('ParagraphBuilder::pushStyle')
+  external void _pushStyle(
     Int32List encoded,
-    List<dynamic> fontFamilies,
-    double? fontSize,
-    double? letterSpacing,
-    double? wordSpacing,
-    double? height,
-    double? decorationThickness,
+    List<Object?> fontFamilies,
+    double fontSize,
+    double letterSpacing,
+    double wordSpacing,
+    double height,
+    double decorationThickness,
     String locale,
-    List<dynamic>? backgroundObjects,
+    List<Object?>? backgroundObjects,
     ByteData? backgroundData,
-    List<dynamic>? foregroundObjects,
+    List<Object?>? foregroundObjects,
     ByteData? foregroundData,
     ByteData shadowsData,
     ByteData? fontFeaturesData,
-  ) native 'ParagraphBuilder_pushStyle';
+    ByteData? fontVariationsData,
+  );
 
   static String _encodeLocale(Locale? locale) => locale?.toString() ?? '';
 
@@ -3455,17 +3086,21 @@ class ParagraphBuilder extends NativeFieldWrapperClass1 {
   /// added to the paragraph is affected by all the styles in the stack. Calling
   /// [pop] removes the topmost style in the stack, leaving the remaining styles
   /// in effect.
-  void pop() native 'ParagraphBuilder_pop';
+  @FfiNative<Void Function(Pointer<Void>)>('ParagraphBuilder::pop', isLeaf: true)
+  external void pop();
 
   /// Adds the given text to the paragraph.
   ///
   /// The text will be styled according to the current stack of text styles.
   void addText(String text) {
     final String? error = _addText(text);
-    if (error != null)
+    if (error != null) {
       throw ArgumentError(error);
+    }
   }
-  String? _addText(String text) native 'ParagraphBuilder_addText';
+
+  @FfiNative<Handle Function(Pointer<Void>, Handle)>('ParagraphBuilder::addText')
+  external String? _addText(String text);
 
   /// Adds an inline placeholder space to the paragraph.
   ///
@@ -3479,7 +3114,7 @@ class ParagraphBuilder extends NativeFieldWrapperClass1 {
   /// [PlaceholderAlignment.aboveBaseline], and [PlaceholderAlignment.belowBaseline]
   /// alignment modes are used, the baseline needs to be set with the `baseline`.
   /// When using [PlaceholderAlignment.baseline], `baselineOffset` indicates the distance
-  /// of the baseline down from the top of of the rectangle. The default `baselineOffset`
+  /// of the baseline down from the top of the rectangle. The default `baselineOffset`
   /// is the `height`.
   ///
   /// Examples:
@@ -3526,11 +3161,13 @@ class ParagraphBuilder extends NativeFieldWrapperClass1 {
     // Default the baselineOffset to height if null. This will place the placeholder
     // fully above the baseline, similar to [PlaceholderAlignment.aboveBaseline].
     baselineOffset = baselineOffset ?? height;
-    _addPlaceholder(width * scale, height * scale, alignment.index, baselineOffset * scale, baseline?.index);
+    _addPlaceholder(width * scale, height * scale, alignment.index, baselineOffset * scale, (baseline ?? TextBaseline.alphabetic).index);
     _placeholderCount++;
     _placeholderScales.add(scale);
   }
-  String? _addPlaceholder(double width, double height, int alignment, double baselineOffset, int? baseline) native 'ParagraphBuilder_addPlaceholder';
+
+  @FfiNative<Handle Function(Pointer<Void>, Double, Double, Uint32, Double, Uint32)>('ParagraphBuilder::addPlaceholder')
+  external String? _addPlaceholder(double width, double height, int alignment, double baselineOffset, int baseline);
 
   /// Applies the given paragraph style and returns a [Paragraph] containing the
   /// added text and associated styling.
@@ -3542,7 +3179,9 @@ class ParagraphBuilder extends NativeFieldWrapperClass1 {
     _build(paragraph);
     return paragraph;
   }
-  void _build(Paragraph outParagraph) native 'ParagraphBuilder_build';
+
+  @FfiNative<Void Function(Pointer<Void>, Handle)>('ParagraphBuilder::build')
+  external void _build(Paragraph outParagraph);
 }
 
 /// Loads a font from a buffer and makes it available for rendering text.
@@ -3553,13 +3192,14 @@ class ParagraphBuilder extends NativeFieldWrapperClass1 {
 Future<void> loadFontFromList(Uint8List list, {String? fontFamily}) {
   return _futurize(
     (_Callback<void> callback) {
-      _loadFontFromList(list, callback, fontFamily);
+      _loadFontFromList(list, callback, fontFamily ?? '');
+      return null;
     }
   ).then((_) => _sendFontChangeMessage());
 }
 
 final ByteData _fontChangeMessage = utf8.encoder.convert(
-  json.encode(<String, dynamic>{'type': 'fontsChange'})
+  json.encode(<String, Object?>{'type': 'fontsChange'})
 ).buffer.asByteData();
 
 FutureOr<void> _sendFontChangeMessage() async {
@@ -3577,16 +3217,5 @@ FutureOr<void> _sendFontChangeMessage() async {
   }
 }
 
-// TODO(gspencergoog): remove this template block once the framework templates
-// are renamed to not reference it.
-/// {@template flutter.dart:ui.textHeightBehavior}
-/// Defines how the paragraph will apply [TextStyle.height] to the ascent of the
-/// first line and descent of the last line.
-///
-/// Each boolean value represents whether the [TextStyle.height] modifier will
-/// be applied to the corresponding metric. By default, all properties are true,
-/// and [TextStyle.height] is applied as normal. When set to false, the font's
-/// default ascent will be used.
-/// {@endtemplate}
-
-void _loadFontFromList(Uint8List list, _Callback<void> callback, String? fontFamily) native 'loadFontFromList';
+@FfiNative<Void Function(Handle, Handle, Handle)>('FontCollection::LoadFontFromList')
+external void _loadFontFromList(Uint8List list, _Callback<void> callback, String fontFamily);

@@ -5,16 +5,12 @@
 #ifndef FLUTTER_LIB_UI_PAINTING_PICTURE_H_
 #define FLUTTER_LIB_UI_PAINTING_PICTURE_H_
 
-#include "flutter/flow/display_list.h"
+#include "flutter/display_list/display_list.h"
 #include "flutter/flow/skia_gpu_object.h"
 #include "flutter/lib/ui/dart_wrapper.h"
 #include "flutter/lib/ui/painting/image.h"
 #include "flutter/lib/ui/ui_dart_state.h"
 #include "third_party/skia/include/core/SkPicture.h"
-
-namespace tonic {
-class DartLibraryNatives;
-}  // namespace tonic
 
 namespace flutter {
 class Canvas;
@@ -25,13 +21,10 @@ class Picture : public RefCountedDartWrappable<Picture> {
 
  public:
   ~Picture() override;
-  static fml::RefPtr<Picture> Create(Dart_Handle dart_handle,
-                                     flutter::SkiaGPUObject<SkPicture> picture);
   static fml::RefPtr<Picture> Create(
       Dart_Handle dart_handle,
       flutter::SkiaGPUObject<DisplayList> display_list);
 
-  sk_sp<SkPicture> picture() const { return picture_.skia_object(); }
   sk_sp<DisplayList> display_list() const {
     return display_list_.skia_object();
   }
@@ -40,13 +33,20 @@ class Picture : public RefCountedDartWrappable<Picture> {
                       uint32_t height,
                       Dart_Handle raw_image_callback);
 
+  void toImageSync(uint32_t width,
+                   uint32_t height,
+                   Dart_Handle raw_image_handle);
+
   void dispose();
 
   size_t GetAllocationSize() const override;
 
-  static void RegisterNatives(tonic::DartLibraryNatives* natives);
+  static void RasterizeToImageSync(sk_sp<DisplayList> display_list,
+                                   uint32_t width,
+                                   uint32_t height,
+                                   Dart_Handle raw_image_handle);
 
-  static Dart_Handle RasterizeToImage(sk_sp<SkPicture> picture,
+  static Dart_Handle RasterizeToImage(sk_sp<DisplayList> display_list,
                                       uint32_t width,
                                       uint32_t height,
                                       Dart_Handle raw_image_callback);
@@ -58,10 +58,8 @@ class Picture : public RefCountedDartWrappable<Picture> {
       Dart_Handle raw_image_callback);
 
  private:
-  Picture(flutter::SkiaGPUObject<SkPicture> picture);
-  Picture(flutter::SkiaGPUObject<DisplayList> display_list);
+  explicit Picture(flutter::SkiaGPUObject<DisplayList> display_list);
 
-  flutter::SkiaGPUObject<SkPicture> picture_;
   flutter::SkiaGPUObject<DisplayList> display_list_;
 };
 

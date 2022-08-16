@@ -13,7 +13,6 @@
 #include "flutter/shell/common/platform_view.h"
 #include "flutter/shell/common/rasterizer.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterViewController_Internal.h"
-#import "flutter/shell/platform/darwin/ios/ios_surface_gl.h"
 #import "flutter/shell/platform/darwin/ios/ios_surface_software.h"
 #include "third_party/skia/include/utils/mac/SkCGUtils.h"
 
@@ -22,21 +21,18 @@
 }
 
 - (instancetype)init {
-  @throw([NSException exceptionWithName:@"FlutterView must initWithDelegate"
-                                 reason:nil
-                               userInfo:nil]);
+  NSAssert(NO, @"FlutterView must initWithDelegate");
+  return nil;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
-  @throw([NSException exceptionWithName:@"FlutterView must initWithDelegate"
-                                 reason:nil
-                               userInfo:nil]);
+  NSAssert(NO, @"FlutterView must initWithDelegate");
+  return nil;
 }
 
 - (instancetype)initWithCoder:(NSCoder*)aDecoder {
-  @throw([NSException exceptionWithName:@"FlutterView must initWithDelegate"
-                                 reason:nil
-                               userInfo:nil]);
+  NSAssert(NO, @"FlutterView must initWithDelegate");
+  return nil;
 }
 
 - (instancetype)initWithDelegate:(id<FlutterViewEngineDelegate>)delegate opaque:(BOOL)opaque {
@@ -57,8 +53,7 @@
 }
 
 - (void)layoutSubviews {
-  if ([self.layer isKindOfClass:NSClassFromString(@"CAEAGLLayer")] ||
-      [self.layer isKindOfClass:NSClassFromString(@"CAMetalLayer")]) {
+  if ([self.layer isKindOfClass:NSClassFromString(@"CAMetalLayer")]) {
     CGFloat screenScale = [UIScreen mainScreen].scale;
     self.layer.allowsGroupOpacity = YES;
     self.layer.contentsScale = screenScale;

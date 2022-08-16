@@ -20,11 +20,13 @@ dependencies:
   args: any
   meta: any
   path: any
+  clang_tidy: any
 
 dev_dependencies:
   async_helper: any
   expect: any
   litetest: any
+  smith: any
 
 dependency_overrides:
   args:
@@ -53,3 +55,5 @@ dependency_overrides:
     path: ../../../third_party/pkg/process
   process_runner:
     path: ../../../third_party/pkg/process_runner
+  smith:
+    path: ../../../third_party/dart/pkg/smith

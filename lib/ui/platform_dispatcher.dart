@@ -1,8 +1,6 @@
 // Copyright 2013 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-// @dart = 2.12
 part of dart.ui;
 
 /// Signature of callbacks that have no arguments and return no data.
@@ -27,9 +25,6 @@ typedef TimingsCallback = void Function(List<FrameTiming> timings);
 
 /// Signature for [PlatformDispatcher.onPointerDataPacket].
 typedef PointerDataPacketCallback = void Function(PointerDataPacket packet);
-
-// Signature for the response to KeyDataCallback.
-typedef _KeyDataResponseCallback = void Function(int responseId, bool handled);
 
 /// Signature for [PlatformDispatcher.onKeyData].
 ///
@@ -56,8 +51,23 @@ typedef _SetNeedsReportTimingsFunc = void Function(bool value);
 /// Signature for [PlatformDispatcher.onConfigurationChanged].
 typedef PlatformConfigurationChangedCallback = void Function(PlatformConfiguration configuration);
 
+/// Signature for [PlatformDispatcher.onError].
+///
+/// If this method returns false, the engine may use some fallback method to
+/// provide information about the error.
+///
+/// After calling this method, the process or the VM may terminate. Some severe
+/// unhandled errors may not be able to call this method either, such as Dart
+/// compilation errors or process terminating errors.
+typedef ErrorCallback = bool Function(Object exception, StackTrace stackTrace);
+
 // A gesture setting value that indicates it has not been set by the engine.
 const double _kUnsetGestureSetting = -1.0;
+
+// A message channel to receive KeyData from the platform.
+//
+// See embedder.cc::kFlutterKeyDataChannel for more information.
+const String _kFlutterKeyDataChannel = 'flutter/keydata';
 
 /// Platform event dispatcher singleton.
 ///
@@ -131,10 +141,10 @@ class PlatformDispatcher {
   ///
   /// If any of their configurations change, [onMetricsChanged] will be called.
   Iterable<FlutterView> get views => _views.values;
-  Map<Object, FlutterView> _views = <Object, FlutterView>{};
+  final Map<Object, FlutterView> _views = <Object, FlutterView>{};
 
   // A map of opaque platform view identifiers to view configurations.
-  Map<Object, ViewConfiguration> _viewConfigurations = <Object, ViewConfiguration>{};
+  final Map<Object, ViewConfiguration> _viewConfigurations = <Object, ViewConfiguration>{};
 
   /// A callback that is invoked whenever the [ViewConfiguration] of any of the
   /// [views] changes.
@@ -183,6 +193,9 @@ class PlatformDispatcher {
     double systemGestureInsetBottom,
     double systemGestureInsetLeft,
     double physicalTouchSlop,
+    List<double> displayFeaturesBounds,
+    List<int> displayFeaturesType,
+    List<int> displayFeaturesState,
   ) {
     final ViewConfiguration previousConfiguration =
         _viewConfigurations[id] ?? const ViewConfiguration();
@@ -221,8 +234,41 @@ class PlatformDispatcher {
       gestureSettings: GestureSettings(
         physicalTouchSlop: physicalTouchSlop == _kUnsetGestureSetting ? null : physicalTouchSlop,
       ),
+      displayFeatures: _decodeDisplayFeatures(
+        bounds: displayFeaturesBounds,
+        type: displayFeaturesType,
+        state: displayFeaturesState,
+        devicePixelRatio: devicePixelRatio,
+      ),
     );
     _invoke(onMetricsChanged, _onMetricsChangedZone);
+  }
+
+  List<DisplayFeature> _decodeDisplayFeatures({
+    required List<double> bounds,
+    required List<int> type,
+    required List<int> state,
+    required double devicePixelRatio,
+  }) {
+    assert(bounds.length / 4 == type.length, 'Bounds are rectangles, requiring 4 measurements each');
+    assert(type.length == state.length);
+    final List<DisplayFeature> result = <DisplayFeature>[];
+    for(int i = 0; i < type.length; i++) {
+      final int rectOffset = i * 4;
+      result.add(DisplayFeature(
+        bounds: Rect.fromLTRB(
+          bounds[rectOffset] / devicePixelRatio,
+          bounds[rectOffset + 1] / devicePixelRatio,
+          bounds[rectOffset + 2] / devicePixelRatio,
+          bounds[rectOffset + 3] / devicePixelRatio,
+        ),
+        type: DisplayFeatureType.values[type[i]],
+        state: state[i] < DisplayFeatureState.values.length
+            ? DisplayFeatureState.values[state[i]]
+            : DisplayFeatureState.unknown,
+      ));
+    }
+    return result;
   }
 
   /// A callback invoked when any view begins a frame.
@@ -303,7 +349,7 @@ class PlatformDispatcher {
   //  * pointer_data.cc
   //  * pointer.dart
   //  * AndroidTouchProcessor.java
-  static const int _kPointerDataFieldCount = 29;
+  static const int _kPointerDataFieldCount = 35;
 
   static PointerDataPacket _unpackPointerDataPacket(ByteData packet) {
     const int kStride = Int64List.bytesPerElement;
@@ -343,15 +389,31 @@ class PlatformDispatcher {
         platformData: packet.getInt64(kStride * offset++, _kFakeHostEndian),
         scrollDeltaX: packet.getFloat64(kStride * offset++, _kFakeHostEndian),
         scrollDeltaY: packet.getFloat64(kStride * offset++, _kFakeHostEndian),
+        panX: packet.getFloat64(kStride * offset++, _kFakeHostEndian),
+        panY: packet.getFloat64(kStride * offset++, _kFakeHostEndian),
+        panDeltaX: packet.getFloat64(kStride * offset++, _kFakeHostEndian),
+        panDeltaY: packet.getFloat64(kStride * offset++, _kFakeHostEndian),
+        scale: packet.getFloat64(kStride * offset++, _kFakeHostEndian),
+        rotation: packet.getFloat64(kStride * offset++, _kFakeHostEndian),
       ));
       assert(offset == (i + 1) * _kPointerDataFieldCount);
     }
     return PointerDataPacket(data: data);
   }
 
-  /// Called by [_dispatchKeyData].
-  void _respondToKeyData(int responseId, bool handled)
-      native 'PlatformConfiguration_respondToKeyData';
+  static ChannelCallback _keyDataListener(KeyDataCallback onKeyData, Zone zone) =>
+    (ByteData? packet, PlatformMessageResponseCallback callback) {
+      _invoke1<KeyData>(
+        (KeyData keyData) {
+          final bool handled = onKeyData(keyData);
+          final Uint8List response = Uint8List(1);
+          response[0] = handled ? 1 : 0;
+          callback(response.buffer.asByteData());
+        },
+        zone,
+        _unpackKeyData(packet!),
+      );
+    };
 
   /// A callback that is invoked when key data is available.
   ///
@@ -362,22 +424,13 @@ class PlatformDispatcher {
   /// framework and should not be propagated further.
   KeyDataCallback? get onKeyData => _onKeyData;
   KeyDataCallback? _onKeyData;
-  Zone _onKeyDataZone = Zone.root;
   set onKeyData(KeyDataCallback? callback) {
     _onKeyData = callback;
-    _onKeyDataZone = Zone.current;
-  }
-
-  // Called from the engine, via hooks.dart
-  void _dispatchKeyData(ByteData packet, int responseId) {
-    _invoke2<KeyData, _KeyDataResponseCallback>(
-      (KeyData data, _KeyDataResponseCallback callback) {
-        callback(responseId, onKeyData != null && onKeyData!(data));
-      },
-      _onKeyDataZone,
-      _unpackKeyData(packet),
-      _respondToKeyData,
-    );
+    if (callback != null) {
+      channelBuffers.setListener(_kFlutterKeyDataChannel, _keyDataListener(callback, Zone.current));
+    } else {
+      channelBuffers.clearListener(_kFlutterKeyDataChannel);
+    }
   }
 
   // If this value changes, update the encoding code in the following files:
@@ -442,8 +495,11 @@ class PlatformDispatcher {
   }
 
   late _SetNeedsReportTimingsFunc _setNeedsReportTimings;
-  void _nativeSetNeedsReportTimings(bool value)
-      native 'PlatformConfiguration_setNeedsReportTimings';
+
+  void _nativeSetNeedsReportTimings(bool value) => __nativeSetNeedsReportTimings(value);
+
+  @FfiNative<Void Function(Bool)>('PlatformConfigurationNativeApi::SetNeedsReportTimings')
+  external static void __nativeSetNeedsReportTimings(bool value);
 
   // Called from the engine, via hooks.dart
   void _reportTimings(List<int> timings) {
@@ -467,12 +523,16 @@ class PlatformDispatcher {
   void sendPlatformMessage(String name, ByteData? data, PlatformMessageResponseCallback? callback) {
     final String? error =
         _sendPlatformMessage(name, _zonedPlatformMessageResponseCallback(callback), data);
-    if (error != null)
+    if (error != null) {
       throw Exception(error);
+    }
   }
 
-  String? _sendPlatformMessage(String name, PlatformMessageResponseCallback? callback, ByteData? data)
-      native 'PlatformConfiguration_sendPlatformMessage';
+  String? _sendPlatformMessage(String name,PlatformMessageResponseCallback? callback, ByteData? data) =>
+      __sendPlatformMessage(name, callback, data);
+
+  @FfiNative<Handle Function(Handle, Handle, Handle)>('PlatformConfigurationNativeApi::SendPlatformMessage')
+  external static String? __sendPlatformMessage(String name, PlatformMessageResponseCallback? callback, ByteData? data);
 
   /// Called whenever this platform dispatcher receives a message from a
   /// platform-specific plugin.
@@ -498,8 +558,10 @@ class PlatformDispatcher {
   }
 
   /// Called by [_dispatchPlatformMessage].
-  void _respondToPlatformMessage(int responseId, ByteData? data)
-      native 'PlatformConfiguration_respondToPlatformMessage';
+  void _respondToPlatformMessage(int responseId, ByteData? data) => __respondToPlatformMessage(responseId, data);
+
+  @FfiNative<Void Function(IntPtr, Handle)>('PlatformConfigurationNativeApi::RespondToPlatformMessage')
+  external static void __respondToPlatformMessage(int responseId, ByteData? data);
 
   /// Wraps the given [callback] in another callback that ensures that the
   /// original callback is called in the zone it was registered in.
@@ -556,7 +618,10 @@ class PlatformDispatcher {
   /// This can be combined with flutter tools `--isolate-filter` flag to debug
   /// specific root isolates. For example: `flutter attach --isolate-filter=[name]`.
   /// Note that this does not rename any child isolates of the root.
-  void setIsolateDebugName(String name) native 'PlatformConfiguration_setIsolateDebugName';
+  void setIsolateDebugName(String name) => _setIsolateDebugName(name);
+
+  @FfiNative<Void Function(Handle)>('PlatformConfigurationNativeApi::SetIsolateDebugName')
+  external static void _setIsolateDebugName(String name);
 
   /// The embedder can specify data that the isolate can request synchronously
   /// on launch. This accessor fetches that data.
@@ -567,7 +632,10 @@ class PlatformDispatcher {
   ///
   /// For asynchronous communication between the embedder and isolate, a
   /// platform channel may be used.
-  ByteData? getPersistentIsolateData() native 'PlatformConfiguration_getPersistentIsolateData';
+  ByteData? getPersistentIsolateData() => _getPersistentIsolateData();
+
+  @FfiNative<Handle Function()>('PlatformConfigurationNativeApi::GetPersistentIsolateData')
+  external static ByteData? _getPersistentIsolateData();
 
   /// Requests that, at the next appropriate opportunity, the [onBeginFrame] and
   /// [onDrawFrame] callbacks be invoked.
@@ -576,7 +644,10 @@ class PlatformDispatcher {
   ///
   ///  * [SchedulerBinding], the Flutter framework class which manages the
   ///    scheduling of frames.
-  void scheduleFrame() native 'PlatformConfiguration_scheduleFrame';
+  void scheduleFrame() => _scheduleFrame();
+
+  @FfiNative<Void Function()>('PlatformConfigurationNativeApi::ScheduleFrame')
+  external static void _scheduleFrame();
 
   /// Additional accessibility features that may be enabled by the platform.
   AccessibilityFeatures get accessibilityFeatures => configuration.accessibilityFeatures;
@@ -616,7 +687,10 @@ class PlatformDispatcher {
   ///
   /// In either case, this function disposes the given update, which means the
   /// semantics update cannot be used further.
-  void updateSemantics(SemanticsUpdate update) native 'PlatformConfiguration_updateSemantics';
+  void updateSemantics(SemanticsUpdate update) => _updateSemantics(update);
+
+  @FfiNative<Void Function(Pointer<Void>)>('PlatformConfigurationNativeApi::UpdateSemantics')
+  external static void _updateSemantics(SemanticsUpdate update);
 
   /// The system-reported default locale of the device.
   ///
@@ -674,7 +748,11 @@ class PlatformDispatcher {
     }
     return null;
   }
-  List<String> _computePlatformResolvedLocale(List<String?> supportedLocalesData) native 'PlatformConfiguration_computePlatformResolvedLocale';
+
+  List<String> _computePlatformResolvedLocale(List<String?> supportedLocalesData) => __computePlatformResolvedLocale(supportedLocalesData);
+
+  @FfiNative<Handle Function(Handle)>('PlatformConfigurationNativeApi::ComputePlatformResolvedLocale')
+  external static List<String> __computePlatformResolvedLocale(List<String?> supportedLocalesData);
 
   /// A callback that is invoked whenever [locale] changes value.
   ///
@@ -746,8 +824,9 @@ class PlatformDispatcher {
   void _updateLifecycleState(String state) {
     // We do not update the state if the state has already been used to initialize
     // the lifecycleState.
-    if (!_initialLifecycleStateAccessed)
+    if (!_initialLifecycleStateAccessed) {
       _initialLifecycleState = state;
+    }
   }
 
   /// The setting indicating whether time should always be shown in the 24-hour
@@ -787,6 +866,24 @@ class PlatformDispatcher {
     _onTextScaleFactorChangedZone = Zone.current;
   }
 
+  /// Whether the spell check service is supported on the current platform.
+  ///
+  /// This option is used by [EditableTextState] to define its
+  /// [SpellCheckConfiguration] when a default spell check service
+  /// is requested.
+  bool get nativeSpellCheckServiceDefined => _nativeSpellCheckServiceDefined;
+  bool _nativeSpellCheckServiceDefined = false;
+
+  /// Whether briefly displaying the characters as you type in obscured text
+  /// fields is enabled in system settings.
+  ///
+  /// See also:
+  ///
+  ///  * [EditableText.obscureText], which when set to true hides the text in
+  ///    the text field.
+  bool get brieflyShowPassword => _brieflyShowPassword;
+  bool _brieflyShowPassword = true;
+
   /// The setting indicating the current brightness mode of the host platform.
   /// If the platform has no preference, [platformBrightness] defaults to
   /// [Brightness.light].
@@ -809,30 +906,64 @@ class PlatformDispatcher {
     _onPlatformBrightnessChangedZone = Zone.current;
   }
 
+  /// The setting indicating the current system font of the host platform.
+  String? get systemFontFamily => configuration.systemFontFamily;
+
+  /// A callback that is invoked whenever [systemFontFamily] changes value.
+  ///
+  /// The framework invokes this callback in the same zone in which the callback
+  /// was set.
+  ///
+  /// See also:
+  ///
+  ///  * [WidgetsBindingObserver], for a mechanism at the widgets layer to
+  ///    observe when this callback is invoked.
+  VoidCallback? get onSystemFontFamilyChanged => _onSystemFontFamilyChanged;
+  VoidCallback? _onSystemFontFamilyChanged;
+  Zone _onSystemFontFamilyChangedZone = Zone.root;
+  set onSystemFontFamilyChanged(VoidCallback? callback) {
+    _onSystemFontFamilyChanged = callback;
+    _onSystemFontFamilyChangedZone = Zone.current;
+  }
+
   // Called from the engine, via hooks.dart
   void _updateUserSettingsData(String jsonData) {
-    final Map<String, dynamic> data = json.decode(jsonData) as Map<String, dynamic>;
+    final Map<String, Object?> data = json.decode(jsonData) as Map<String, Object?>;
     if (data.isEmpty) {
       return;
     }
 
-    final double textScaleFactor = (data['textScaleFactor'] as num).toDouble();
-    final bool alwaysUse24HourFormat = data['alwaysUse24HourFormat'] as bool;
+    final double textScaleFactor = (data['textScaleFactor']! as num).toDouble();
+    final bool alwaysUse24HourFormat = data['alwaysUse24HourFormat']! as bool;
+    final bool? nativeSpellCheckServiceDefined = data['nativeSpellCheckServiceDefined'] as bool?;
+    if (nativeSpellCheckServiceDefined != null) {
+      _nativeSpellCheckServiceDefined = nativeSpellCheckServiceDefined;
+    } else {
+      _nativeSpellCheckServiceDefined = false;
+    }
+    // This field is optional.
+    final bool? brieflyShowPassword = data['brieflyShowPassword'] as bool?;
+    if (brieflyShowPassword != null) {
+      _brieflyShowPassword = brieflyShowPassword;
+    }
     final Brightness platformBrightness =
-    data['platformBrightness'] as String == 'dark' ? Brightness.dark : Brightness.light;
+    data['platformBrightness']! as String == 'dark' ? Brightness.dark : Brightness.light;
+    final String? systemFontFamily = data['systemFontFamily'] as String?;
     final PlatformConfiguration previousConfiguration = configuration;
-    final bool platformBrightnessChanged =
-        previousConfiguration.platformBrightness != platformBrightness;
+    final bool platformBrightnessChanged = previousConfiguration.platformBrightness != platformBrightness;
     final bool textScaleFactorChanged = previousConfiguration.textScaleFactor != textScaleFactor;
     final bool alwaysUse24HourFormatChanged =
         previousConfiguration.alwaysUse24HourFormat != alwaysUse24HourFormat;
-    if (!platformBrightnessChanged && !textScaleFactorChanged && !alwaysUse24HourFormatChanged) {
+    final bool systemFontFamilyChanged =
+        previousConfiguration.systemFontFamily != systemFontFamily;
+    if (!platformBrightnessChanged && !textScaleFactorChanged && !alwaysUse24HourFormatChanged && !systemFontFamilyChanged) {
       return;
     }
     _configuration = previousConfiguration.copyWith(
       textScaleFactor: textScaleFactor,
       alwaysUse24HourFormat: alwaysUse24HourFormat,
       platformBrightness: platformBrightness,
+      systemFontFamily: systemFontFamily,
     );
     _invoke(onPlatformConfigurationChanged, _onPlatformConfigurationChangedZone);
     if (textScaleFactorChanged) {
@@ -840,6 +971,9 @@ class PlatformDispatcher {
     }
     if (platformBrightnessChanged) {
       _invoke(onPlatformBrightnessChanged, _onPlatformBrightnessChangedZone);
+    }
+    if (systemFontFamilyChanged) {
+      _invoke(onSystemFontFamilyChanged, _onSystemFontFamilyChangedZone);
     }
   }
 
@@ -925,6 +1059,50 @@ class PlatformDispatcher {
     );
   }
 
+  ErrorCallback? _onError;
+  Zone? _onErrorZone;
+
+  /// A callback that is invoked when an unhandled error occurs in the root
+  /// isolate.
+  ///
+  /// This callback must return `true` if it has handled the error. Otherwise,
+  /// it must return `false` and a fallback mechanism such as printing to stderr
+  /// will be used, as configured by the specific platform embedding via
+  /// `Settings::unhandled_exception_callback`.
+  ///
+  /// The VM or the process may exit or become unresponsive after calling this
+  /// callback. The callback will not be called for exceptions that cause the VM
+  /// or process to terminate or become unresponsive before the callback can be
+  /// invoked.
+  ///
+  /// This callback is not directly invoked by errors in child isolates of the
+  /// root isolate. Programs that create new isolates must listen for errors on
+  /// those isolates and forward the errors to the root isolate. An example of
+  /// this can be found in the Flutter framework's `compute` function.
+  ErrorCallback? get onError => _onError;
+  set onError(ErrorCallback? callback) {
+    _onError = callback;
+    _onErrorZone = Zone.current;
+  }
+
+  bool _dispatchError(Object error, StackTrace stackTrace) {
+    if (_onError == null) {
+      return false;
+    }
+    assert(_onErrorZone != null);
+
+    if (identical(_onErrorZone, Zone.current)) {
+      return _onError!(error, stackTrace);
+    } else {
+      try {
+        return _onErrorZone!.runBinary<bool, Object, StackTrace>(_onError!, error, stackTrace);
+      } catch (e, s) {
+        _onErrorZone!.handleUncaughtError(e, s);
+        return false;
+      }
+    }
+  }
+
   /// The route or path that the embedder requested when the application was
   /// launched.
   ///
@@ -956,7 +1134,9 @@ class PlatformDispatcher {
   ///  * [SystemChannels.navigation], which handles subsequent navigation
   ///    requests from the embedder.
   String get defaultRouteName => _defaultRouteName();
-  String _defaultRouteName() native 'PlatformConfiguration_defaultRouteName';
+
+  @FfiNative<Handle Function()>('PlatformConfigurationNativeApi::DefaultRouteName')
+  external static String _defaultRouteName();
 }
 
 /// Configuration of the platform.
@@ -972,6 +1152,7 @@ class PlatformConfiguration {
     this.textScaleFactor = 1.0,
     this.locales = const <Locale>[],
     this.defaultRouteName,
+    this.systemFontFamily,
   });
 
   /// Copy a [PlatformConfiguration] with some fields replaced.
@@ -983,6 +1164,7 @@ class PlatformConfiguration {
     double? textScaleFactor,
     List<Locale>? locales,
     String? defaultRouteName,
+    String? systemFontFamily,
   }) {
     return PlatformConfiguration(
       accessibilityFeatures: accessibilityFeatures ?? this.accessibilityFeatures,
@@ -992,6 +1174,7 @@ class PlatformConfiguration {
       textScaleFactor: textScaleFactor ?? this.textScaleFactor,
       locales: locales ?? this.locales,
       defaultRouteName: defaultRouteName ?? this.defaultRouteName,
+      systemFontFamily: systemFontFamily ?? this.systemFontFamily,
     );
   }
 
@@ -1020,6 +1203,9 @@ class PlatformConfiguration {
   /// The route or path that the embedder requested when the application was
   /// launched.
   final String? defaultRouteName;
+
+  /// The system-reported default font family.
+  final String? systemFontFamily;
 }
 
 /// An immutable view configuration.
@@ -1035,6 +1221,7 @@ class ViewConfiguration {
     this.systemGestureInsets = WindowPadding.zero,
     this.padding = WindowPadding.zero,
     this.gestureSettings = const GestureSettings(),
+    this.displayFeatures = const <DisplayFeature>[],
   });
 
   /// Copy this configuration with some fields replaced.
@@ -1047,7 +1234,8 @@ class ViewConfiguration {
     WindowPadding? viewPadding,
     WindowPadding? systemGestureInsets,
     WindowPadding? padding,
-    GestureSettings? gestureSettings
+    GestureSettings? gestureSettings,
+    List<DisplayFeature>? displayFeatures,
   }) {
     return ViewConfiguration(
       window: window ?? this.window,
@@ -1059,6 +1247,7 @@ class ViewConfiguration {
       systemGestureInsets: systemGestureInsets ?? this.systemGestureInsets,
       padding: padding ?? this.padding,
       gestureSettings: gestureSettings ?? this.gestureSettings,
+      displayFeatures: displayFeatures ?? this.displayFeatures,
     );
   }
 
@@ -1137,6 +1326,26 @@ class ViewConfiguration {
   /// by the gesture settings and should be preferred over the framework
   /// touch slop constant.
   final GestureSettings gestureSettings;
+
+  /// {@template dart.ui.ViewConfiguration.displayFeatures}
+  /// Areas of the display that are obstructed by hardware features.
+  ///
+  /// This list is populated only on Android. If the device has no display
+  /// features, this list is empty.
+  ///
+  /// The coordinate space in which the [DisplayFeature.bounds] are defined spans
+  /// across the screens currently in use. This means that the space between the screens
+  /// is virtually part of the Flutter view space, with the [DisplayFeature.bounds]
+  /// of the display feature as an obstructed area. The [DisplayFeature.type] can
+  /// be used to determine if this display feature obstructs the screen or not.
+  /// For example, [DisplayFeatureType.hinge] and [DisplayFeatureType.cutout] both
+  /// obstruct the display, while [DisplayFeatureType.fold] is a crease in the display.
+  ///
+  /// Folding [DisplayFeature]s like the [DisplayFeatureType.hinge] and
+  /// [DisplayFeatureType.fold] also have a [DisplayFeature.state] which can be
+  /// used to determine the posture the device is in.
+  /// {@endtemplate}
+  final List<DisplayFeature> displayFeatures;
 
   @override
   String toString() {
@@ -1245,8 +1454,6 @@ class FrameTiming {
     ]);
   }
 
-  static final int _dataLength = FramePhase.values.length + _FrameTimingInfo.values.length;
-
   /// Construct [FrameTiming] with raw timestamps in microseconds.
   ///
   /// List [timestamps] must have the same number of elements as
@@ -1254,8 +1461,9 @@ class FrameTiming {
   ///
   /// This constructor is usually only called by the Flutter engine, or a test.
   /// To get the [FrameTiming] of your app, see [PlatformDispatcher.onReportTimings].
-  FrameTiming._(this._data)
-      : assert(_data.length == _dataLength);
+  FrameTiming._(this._data) : assert(_data.length == _dataLength);
+
+  static final int _dataLength = FramePhase.values.length + _FrameTimingInfo.values.length;
 
   /// This is a raw timestamp in microseconds from some epoch. The epoch in all
   /// [FrameTiming] is the same, but it may not match [DateTime]'s epoch.
@@ -1335,7 +1543,7 @@ class FrameTiming {
   /// The frame key associated with this frame measurement.
   int get frameNumber => _data.last;
 
-  final List<int> _data;  // some elements in microseconds, some in bytes, some are counts
+  final List<int> _data; // some elements in microseconds, some in bytes, some are counts
 
   String _formatMS(Duration duration) => '${duration.inMicroseconds * 0.001}ms';
 
@@ -1441,6 +1649,138 @@ class WindowPadding {
   String toString() {
     return 'WindowPadding(left: $left, top: $top, right: $right, bottom: $bottom)';
   }
+}
+
+/// Area of the display that may be obstructed by a hardware feature.
+///
+/// This is populated only on Android.
+///
+/// The [bounds] are measured in logical pixels. On devices with two screens the
+/// coordinate system starts with [0,0] in the top-left corner of the left or top screen
+/// and expands to include both screens and the visual space between them.
+///
+/// The [type] describes the behaviour and if [DisplayFeature] obstructs the display.
+/// For example, [DisplayFeatureType.hinge] and [DisplayFeatureType.cutout] both obstruct the display,
+/// while [DisplayFeatureType.fold] does not.
+///
+/// ![Device with a hinge display feature](https://flutter.github.io/assets-for-api-docs/assets/hardware/display_feature_hinge.png)
+///
+/// ![Device with a fold display feature](https://flutter.github.io/assets-for-api-docs/assets/hardware/display_feature_fold.png)
+///
+/// ![Device with a cutout display feature](https://flutter.github.io/assets-for-api-docs/assets/hardware/display_feature_cutout.png)
+///
+/// The [state] contains information about the posture for foldable features
+/// ([DisplayFeatureType.hinge] and [DisplayFeatureType.fold]). The posture is
+/// the shape of the display, for example [DisplayFeatureState.postureFlat] or
+/// [DisplayFeatureState.postureHalfOpened]. For [DisplayFeatureType.cutout],
+/// the state is not used and has the [DisplayFeatureState.unknown] value.
+class DisplayFeature {
+  const DisplayFeature({
+    required this.bounds,
+    required this.type,
+    required this.state,
+  }) : assert(!identical(type, DisplayFeatureType.cutout) || identical(state, DisplayFeatureState.unknown));
+
+  /// The area of the flutter view occupied by this display feature, measured in logical pixels.
+  ///
+  /// On devices with two screens, the Flutter view spans from the top-left corner
+  /// of the left or top screen to the bottom-right corner of the right or bottom screen,
+  /// including the visual area occupied by any display feature. Bounds of display
+  /// features are reported in this coordinate system.
+  ///
+  /// For example, on a dual screen device in portrait mode:
+  ///
+  /// * [bounds.left] gives you the size of left screen, in logical pixels.
+  /// * [bounds.right] gives you the size of the left screen + the hinge width.
+  final Rect bounds;
+
+  /// Type of display feature, e.g. hinge, fold, cutout.
+  final DisplayFeatureType type;
+
+  /// Posture of display feature, which is populated only for folds and hinges.
+  ///
+  /// For cutouts, this is [DisplayFeatureState.unknown]
+  final DisplayFeatureState state;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other.runtimeType != runtimeType) {
+      return false;
+    }
+    return other is DisplayFeature
+        && bounds == other.bounds
+        && type == other.type
+        && state == other.state;
+  }
+
+  @override
+  int get hashCode => Object.hash(bounds, type, state);
+
+  @override
+  String toString() {
+    return 'DisplayFeature(rect: $bounds, type: $type, state: $state)';
+  }
+}
+
+/// Type of [DisplayFeature], describing the [DisplayFeature] behaviour and if
+/// it obstructs the display.
+///
+/// Some types of [DisplayFeature], like [DisplayFeatureType.fold], can be
+/// reported without actually impeding drawing on the screen. They are useful
+/// for knowing where the display is bent or has a crease. The
+/// [DisplayFeature.bounds] can be 0-width in such cases.
+///
+/// The shape formed by the screens for types [DisplayFeatureType.fold] and
+/// [DisplayFeatureType.hinge] is called the posture and is exposed in
+/// [DisplayFeature.state]. For example, the [DisplayFeatureState.postureFlat] posture
+/// means the screens form a flat surface, while [DisplayFeatureState.postureFlipped]
+/// posture means the screens are facing opposite directions.
+///
+/// ![Device with a hinge display feature](https://flutter.github.io/assets-for-api-docs/assets/hardware/display_feature_hinge.png)
+///
+/// ![Device with a fold display feature](https://flutter.github.io/assets-for-api-docs/assets/hardware/display_feature_fold.png)
+///
+/// ![Device with a cutout display feature](https://flutter.github.io/assets-for-api-docs/assets/hardware/display_feature_cutout.png)
+enum DisplayFeatureType {
+  /// [DisplayFeature] type is new and not yet known to Flutter.
+  unknown,
+  /// A fold in the flexible screen without a physical gap.
+  ///
+  /// The bounds for this display feature type indicate where the display makes a crease.
+  fold,
+  /// A physical separation with a hinge that allows two display panels to fold.
+  hinge,
+  /// A non-displaying area of the screen, usually housing cameras or sensors.
+  cutout,
+}
+
+/// State of the display feature, which contains information about the posture
+/// for foldable features.
+///
+/// The posture is the shape made by the parts of the flexible screen or
+/// physical screen panels. They are inspired by and similar to
+/// [Android Postures](https://developer.android.com/guide/topics/ui/foldables#postures).
+///
+/// * For [DisplayFeatureType.fold]s & [DisplayFeatureType.hinge]s, the state is
+///   the posture.
+/// * For [DisplayFeatureType.cutout]s, the state is not used and has the
+/// [DisplayFeatureState.unknown] value.
+enum DisplayFeatureState {
+  /// The display feature is a [DisplayFeatureType.cutout] or this state is new
+  /// and not yet known to Flutter.
+  unknown,
+  /// The foldable device is completely open.
+  ///
+  /// The screen space that is presented to the user is flat.
+  postureFlat,
+  /// Fold angle is in an intermediate position between opened and closed state.
+  ///
+  /// There is a non-flat angle between parts of the flexible screen or between
+  /// physical screen panels such that the screens start to face each other.
+  postureHalfOpened,
 }
 
 /// An identifier used to select a user's language and formatting preferences.
@@ -1689,22 +2029,23 @@ class Locale {
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other))
+    if (identical(this, other)) {
       return true;
+    }
     if (other is! Locale) {
       return false;
     }
-    final String? countryCode = _countryCode;
+    final String? thisCountryCode = countryCode;
     final String? otherCountryCode = other.countryCode;
     return other.languageCode == languageCode
         && other.scriptCode == scriptCode // scriptCode cannot be ''
-        && (other.countryCode == countryCode // Treat '' as equal to null.
-            || otherCountryCode != null && otherCountryCode.isEmpty && countryCode == null
-            || countryCode != null && countryCode.isEmpty && other.countryCode == null);
+        && (other.countryCode == thisCountryCode // Treat '' as equal to null.
+            || otherCountryCode != null && otherCountryCode.isEmpty && thisCountryCode == null
+            || thisCountryCode != null && thisCountryCode.isEmpty && other.countryCode == null);
   }
 
   @override
-  int get hashCode => hashValues(languageCode, scriptCode, countryCode == '' ? null : countryCode);
+  int get hashCode => Object.hash(languageCode, scriptCode, countryCode == '' ? null : countryCode);
 
   static Locale? _cachedLocale;
   static String? _cachedLocaleString;
@@ -1733,10 +2074,12 @@ class Locale {
 
   String _rawToString(String separator) {
     final StringBuffer out = StringBuffer(languageCode);
-    if (scriptCode != null && scriptCode!.isNotEmpty)
+    if (scriptCode != null && scriptCode!.isNotEmpty) {
       out.write('$separator$scriptCode');
-    if (_countryCode != null && _countryCode!.isNotEmpty)
+    }
+    if (_countryCode != null && _countryCode!.isNotEmpty) {
       out.write('$separator$countryCode');
+    }
     return out.toString();
   }
 }

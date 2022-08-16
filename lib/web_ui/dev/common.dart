@@ -11,7 +11,6 @@ import 'browser_lock.dart';
 import 'chrome.dart';
 import 'edge.dart';
 import 'firefox.dart';
-import 'safari_ios.dart';
 import 'safari_macos.dart';
 
 /// The port number for debugging.
@@ -29,19 +28,20 @@ abstract class PlatformBinding {
 
   static PlatformBinding _createInstance() {
     if (io.Platform.isLinux) {
-      return _LinuxBinding();
+      return LinuxPlatformBinding();
     }
     if (io.Platform.isMacOS) {
-      return _MacBinding();
+      return MacPlatformBinding();
     }
     if (io.Platform.isWindows) {
-      return _WindowsBinding();
+      return WindowsPlatformBinding();
     }
-    throw '${io.Platform.operatingSystem} is not supported';
+    throw UnsupportedError('${io.Platform.operatingSystem} is not supported');
   }
 
   String getChromeBuild(ChromeLock chromeLock);
   String getChromeDownloadUrl(String version);
+  String getChromeDriverDownloadUrl(String version);
   String getFirefoxDownloadUrl(String version);
   String getFirefoxDownloadFilename(String version);
   String getChromeExecutablePath(io.Directory versionDir);
@@ -54,7 +54,7 @@ abstract class PlatformBinding {
 const String _kBaseDownloadUrl =
     'https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o';
 
-class _WindowsBinding implements PlatformBinding {
+class WindowsPlatformBinding implements PlatformBinding {
   @override
   String getChromeBuild(ChromeLock chromeLock) {
     return chromeLock.windows;
@@ -63,6 +63,10 @@ class _WindowsBinding implements PlatformBinding {
   @override
   String getChromeDownloadUrl(String version) =>
       'https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Win%2F$version%2Fchrome-win.zip?alt=media';
+
+  @override
+  String getChromeDriverDownloadUrl(String version) =>
+      'https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Win%2F$version%2Fchromedriver_win32.zip?alt=media';
 
   @override
   String getChromeExecutablePath(io.Directory versionDir) =>
@@ -92,7 +96,7 @@ class _WindowsBinding implements PlatformBinding {
   String getCommandToRunEdge() => 'MicrosoftEdgeLauncher';
 }
 
-class _LinuxBinding implements PlatformBinding {
+class LinuxPlatformBinding implements PlatformBinding {
   @override
   String getChromeBuild(ChromeLock chromeLock) {
     return chromeLock.linux;
@@ -101,6 +105,10 @@ class _LinuxBinding implements PlatformBinding {
   @override
   String getChromeDownloadUrl(String version) =>
       '$_kBaseDownloadUrl/Linux_x64%2F$version%2Fchrome-linux.zip?alt=media';
+
+  @override
+  String getChromeDriverDownloadUrl(String version) =>
+      '$_kBaseDownloadUrl/Linux_x64%2F$version%2Fchromedriver_linux64.zip?alt=media';
 
   @override
   String getChromeExecutablePath(io.Directory versionDir) =>
@@ -132,7 +140,7 @@ class _LinuxBinding implements PlatformBinding {
       throw UnsupportedError('Edge is not supported on Linux');
 }
 
-class _MacBinding implements PlatformBinding {
+class MacPlatformBinding implements PlatformBinding {
   @override
   String getChromeBuild(ChromeLock chromeLock) {
     return chromeLock.mac;
@@ -141,6 +149,10 @@ class _MacBinding implements PlatformBinding {
   @override
   String getChromeDownloadUrl(String version) =>
       '$_kBaseDownloadUrl/Mac%2F$version%2Fchrome-mac.zip?alt=media';
+
+  @override
+  String getChromeDriverDownloadUrl(String version) =>
+      '$_kBaseDownloadUrl/Mac%2F$version%2Fchromedriver_mac64.zip?alt=media';
 
   @override
   String getChromeExecutablePath(io.Directory versionDir) => path.join(
@@ -218,14 +230,12 @@ const String kChrome = 'chrome';
 const String kEdge = 'edge';
 const String kFirefox = 'firefox';
 const String kSafari = 'safari';
-const String kSafariIos = 'ios-safari';
 
 const List<String> kAllBrowserNames = <String>[
   kChrome,
   kEdge,
   kFirefox,
   kSafari,
-  kSafariIos,
 ];
 
 /// Creates an environment for a browser.
@@ -241,8 +251,6 @@ BrowserEnvironment getBrowserEnvironment(String browserName) {
       return FirefoxEnvironment();
     case kSafari:
       return SafariMacOsEnvironment();
-    case kSafariIos:
-      return SafariIosEnvironment();
   }
   throw UnsupportedError('Browser $browserName is not supported.');
 }

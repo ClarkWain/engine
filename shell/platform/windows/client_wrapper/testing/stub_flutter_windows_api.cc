@@ -111,16 +111,17 @@ uint64_t FlutterDesktopEngineProcessMessages(FlutterDesktopEngineRef engine) {
   return 0;
 }
 
-void FlutterDesktopEngineReloadSystemFonts(FlutterDesktopEngineRef engine) {
+void FlutterDesktopEngineSetNextFrameCallback(FlutterDesktopEngineRef engine,
+                                              VoidCallback callback,
+                                              void* user_data) {
   if (s_stub_implementation) {
-    s_stub_implementation->EngineReloadSystemFonts();
+    s_stub_implementation->EngineSetNextFrameCallback(callback, user_data);
   }
 }
 
-void FlutterDesktopEngineReloadPlatformBrightness(
-    FlutterDesktopEngineRef engine) {
+void FlutterDesktopEngineReloadSystemFonts(FlutterDesktopEngineRef engine) {
   if (s_stub_implementation) {
-    s_stub_implementation->EngineReloadPlatformBrightness();
+    s_stub_implementation->EngineReloadSystemFonts();
   }
 }
 

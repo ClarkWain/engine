@@ -18,8 +18,10 @@ using StringAttributes = std::vector<StringAttributePtr>;
 // When adding a new StringAttributeType, the classes in these file must be
 // updated as well.
 //  * engine/src/flutter/lib/ui/semantics.dart
-//  * engine/src/flutter/lib/web_ui/lib/src/ui/semantics.dart
+//  * engine/src/flutter/lib/web_ui/lib/semantics.dart
 //  * engine/src/flutter/shell/platform/android/io/flutter/view/AccessibilityBridge.java
+//  * engine/src/flutter/lib/web_ui/test/engine/semantics/semantics_api_test.dart
+//  * engine/src/flutter/testing/dart/semantics_test.dart
 
 enum class StringAttributeType : int32_t {
   kSpellOut,
@@ -74,8 +76,6 @@ class NativeStringAttribute
   //----------------------------------------------------------------------------
   /// Returns the c++ representataion of StringAttribute.
   const StringAttributePtr GetAttribute() const;
-
-  static void RegisterNatives(tonic::DartLibraryNatives* natives);
 
  private:
   NativeStringAttribute();

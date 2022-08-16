@@ -17,7 +17,7 @@ namespace {
 constexpr char kTextPlainFormat[] = "text/plain";
 const UInt32 kKeyPressClickSoundId = 1306;
 
-}  // namespaces
+}  // namespace
 
 namespace flutter {
 
@@ -37,12 +37,8 @@ using namespace flutter;
 
 @implementation FlutterPlatformPlugin {
   fml::WeakPtr<FlutterEngine> _engine;
-}
-
-- (instancetype)init {
-  @throw([NSException exceptionWithName:@"FlutterPlatformPlugin must initWithEngine"
-                                 reason:nil
-                               userInfo:nil]);
+  // Used to detect whether this device has live text input ability or not.
+  UITextField* _textField;
 }
 
 - (instancetype)initWithEngine:(fml::WeakPtr<FlutterEngine>)engine {
@@ -94,6 +90,8 @@ using namespace flutter;
     result(nil);
   } else if ([method isEqualToString:@"Clipboard.hasStrings"]) {
     result([self clipboardHasStrings]);
+  } else if ([method isEqualToString:@"LiveText.isLiveTextInputAvailable"]) {
+    result(@([self isLiveTextInputAvailable]));
   } else {
     result(FlutterMethodNotImplemented);
   }
@@ -113,19 +111,17 @@ using namespace flutter;
     return;
   }
 
-  if (@available(iOS 10, *)) {
-    if ([@"HapticFeedbackType.lightImpact" isEqualToString:feedbackType]) {
-      [[[[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight] autorelease]
-          impactOccurred];
-    } else if ([@"HapticFeedbackType.mediumImpact" isEqualToString:feedbackType]) {
-      [[[[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium] autorelease]
-          impactOccurred];
-    } else if ([@"HapticFeedbackType.heavyImpact" isEqualToString:feedbackType]) {
-      [[[[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleHeavy] autorelease]
-          impactOccurred];
-    } else if ([@"HapticFeedbackType.selectionClick" isEqualToString:feedbackType]) {
-      [[[[UISelectionFeedbackGenerator alloc] init] autorelease] selectionChanged];
-    }
+  if ([@"HapticFeedbackType.lightImpact" isEqualToString:feedbackType]) {
+    [[[[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight] autorelease]
+        impactOccurred];
+  } else if ([@"HapticFeedbackType.mediumImpact" isEqualToString:feedbackType]) {
+    [[[[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium] autorelease]
+        impactOccurred];
+  } else if ([@"HapticFeedbackType.heavyImpact" isEqualToString:feedbackType]) {
+    [[[[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleHeavy] autorelease]
+        impactOccurred];
+  } else if ([@"HapticFeedbackType.selectionClick" isEqualToString:feedbackType]) {
+    [[[[UISelectionFeedbackGenerator alloc] init] autorelease] selectionChanged];
   }
 }
 
@@ -136,19 +132,21 @@ using namespace flutter;
     mask |= UIInterfaceOrientationMaskAll;
   } else {
     for (NSString* orientation in orientations) {
-      if ([orientation isEqualToString:@"DeviceOrientation.portraitUp"])
+      if ([orientation isEqualToString:@"DeviceOrientation.portraitUp"]) {
         mask |= UIInterfaceOrientationMaskPortrait;
-      else if ([orientation isEqualToString:@"DeviceOrientation.portraitDown"])
+      } else if ([orientation isEqualToString:@"DeviceOrientation.portraitDown"]) {
         mask |= UIInterfaceOrientationMaskPortraitUpsideDown;
-      else if ([orientation isEqualToString:@"DeviceOrientation.landscapeLeft"])
+      } else if ([orientation isEqualToString:@"DeviceOrientation.landscapeLeft"]) {
         mask |= UIInterfaceOrientationMaskLandscapeLeft;
-      else if ([orientation isEqualToString:@"DeviceOrientation.landscapeRight"])
+      } else if ([orientation isEqualToString:@"DeviceOrientation.landscapeRight"]) {
         mask |= UIInterfaceOrientationMaskLandscapeRight;
+      }
     }
   }
 
-  if (!mask)
+  if (!mask) {
     return;
+  }
   [[NSNotificationCenter defaultCenter]
       postNotificationName:@(kOrientationUpdateNotificationName)
                     object:nil
@@ -205,8 +203,9 @@ using namespace flutter;
 
 - (void)setSystemChromeSystemUIOverlayStyle:(NSDictionary*)message {
   NSString* brightness = message[@"statusBarBrightness"];
-  if (brightness == (id)[NSNull null])
+  if (brightness == (id)[NSNull null]) {
     return;
+  }
 
   UIStatusBarStyle statusBarStyle;
   if ([brightness isEqualToString:@"Brightness.dark"]) {
@@ -244,12 +243,15 @@ using namespace flutter;
   // in the navigation hierarchy.
   // It's also possible in an Add2App scenario that the FlutterViewController was presented
   // outside the context of a UINavigationController, and still wants to be popped.
-  UIViewController* viewController = [UIApplication sharedApplication].keyWindow.rootViewController;
-  if ([viewController isKindOfClass:[UINavigationController class]]) {
-    [((UINavigationController*)viewController) popViewControllerAnimated:isAnimated];
+
+  UIViewController* engineViewController = [_engine.get() viewController];
+  UINavigationController* navigationController = [engineViewController navigationController];
+  if (navigationController) {
+    [navigationController popViewControllerAnimated:isAnimated];
   } else {
-    auto engineViewController = static_cast<UIViewController*>([_engine.get() viewController]);
-    if (engineViewController != viewController) {
+    UIViewController* rootViewController =
+        [UIApplication sharedApplication].keyWindow.rootViewController;
+    if (engineViewController != rootViewController) {
       [engineViewController dismissViewControllerAnimated:isAnimated completion:nil];
     }
   }
@@ -267,23 +269,31 @@ using namespace flutter;
 
 - (void)setClipboardData:(NSDictionary*)data {
   UIPasteboard* pasteboard = [UIPasteboard generalPasteboard];
-  if (data[@"text"]) {
-    pasteboard.string = data[@"text"];
+  id copyText = data[@"text"];
+  if ([copyText isKindOfClass:[NSString class]]) {
+    pasteboard.string = copyText;
   } else {
     pasteboard.string = @"null";
   }
 }
 
 - (NSDictionary*)clipboardHasStrings {
-  bool hasStrings = false;
-  UIPasteboard* pasteboard = [UIPasteboard generalPasteboard];
-  if (@available(iOS 10, *)) {
-    hasStrings = pasteboard.hasStrings;
-  } else {
-    NSString* stringInPasteboard = pasteboard.string;
-    hasStrings = stringInPasteboard != nil;
-  }
-  return @{@"value" : @(hasStrings)};
+  return @{@"value" : @([UIPasteboard generalPasteboard].hasStrings)};
 }
 
+- (BOOL)isLiveTextInputAvailable {
+  return [[self textField] canPerformAction:@selector(captureTextFromCamera:) withSender:nil];
+}
+
+- (UITextField*)textField {
+  if (_textField == nil) {
+    _textField = [[UITextField alloc] init];
+  }
+  return _textField;
+}
+
+- (void)dealloc {
+  [_textField release];
+  [super dealloc];
+}
 @end

@@ -10,8 +10,6 @@ import 'package:path/path.dart' as path;
 
 import 'package:watcher/src/watch_event.dart';
 
-import 'browser.dart';
-import 'common.dart';
 import 'pipeline.dart';
 import 'steps/compile_tests_step.dart';
 import 'steps/run_tests_step.dart';
@@ -23,26 +21,17 @@ class TestCommand extends Command<bool> with ArgUtils<bool> {
     argParser
       ..addFlag(
         'debug',
-        defaultsTo: false,
         help: 'Pauses the browser before running a test, giving you an '
             'opportunity to add breakpoints or inspect loaded code before '
             'running the code.',
       )
       ..addFlag(
         'watch',
-        defaultsTo: false,
         abbr: 'w',
         help: 'Run in watch mode so the tests re-run whenever a change is '
             'made.',
       )
-      ..addFlag(
-        'unit-tests-only',
-        defaultsTo: false,
-        help: 'felt test command runs the unit tests and the integration tests '
-            'at the same time. If this flag is set, only run the unit tests.',
-      )
       ..addFlag('use-system-flutter',
-          defaultsTo: false,
           help:
               'integration tests are using flutter repository for various tasks'
               ', such as flutter drive, flutter pub get. If this flag is set, felt '
@@ -50,38 +39,40 @@ class TestCommand extends Command<bool> with ArgUtils<bool> {
               'can save internet bandwidth. However use with caution. Note that '
               'since flutter repo is always synced to youngest commit older than '
               'the engine commit for the tests running in CI, the tests results '
-              'won\'t be consistent with CIs when this flag is set. flutter '
+              "won't be consistent with CIs when this flag is set. flutter "
               'command should be set in the PATH for this flag to be useful.'
               'This flag can also be used to test local Flutter changes.')
       ..addFlag(
+        'require-skia-gold',
+        help:
+            'Whether we require Skia Gold to be available or not. When this '
+            'flag is true, the tests will fail if Skia Gold is not available.',
+      )
+      ..addFlag(
         'update-screenshot-goldens',
-        defaultsTo: false,
         help:
             'When running screenshot tests writes them to the file system into '
             '.dart_tool/goldens. Use this option to bulk-update all screenshots, '
             'for example, when a new browser version affects pixels.',
       )
-      ..addFlag(
-        'skip-goldens-repo-fetch',
-        defaultsTo: false,
-        help: 'If set reuses the existig flutter/goldens repo clone. Use this '
-            'to avoid overwriting local changes when iterating on golden '
-            'tests. This is off by default.',
-      )
       ..addOption(
         'browser',
         defaultsTo: 'chrome',
-        help: 'An option to choose a browser to run the tests. Tests only work '
-            ' on Chrome for now.',
+        help: 'An option to choose a browser to run the tests. By default '
+              'tests run in Chrome.',
       )
       ..addFlag(
         'fail-early',
-        defaultsTo: false,
-        negatable: true,
         help: 'If set, causes the test runner to exit upon the first test '
               'failure. If not set, the test runner will continue running '
               'test despite failures and will report them after all tests '
               'finish.',
+      )
+      ..addOption(
+        'canvaskit-path',
+        help: 'Optional. The path to a local build of CanvasKit to use in '
+              'tests. If omitted, the test runner uses the default CanvasKit '
+              'build.',
       );
   }
 
@@ -111,34 +102,35 @@ class TestCommand extends Command<bool> with ArgUtils<bool> {
   bool get runAllTests => targets.isEmpty;
 
   /// The name of the browser to run tests in.
-  String get browser => stringArg('browser');
+  String get browserName => stringArg('browser');
+
+  /// When running screenshot tests, require Skia Gold to be available and
+  /// reachable.
+  bool get requireSkiaGold => boolArg('require-skia-gold');
 
   /// When running screenshot tests writes them to the file system into
   /// ".dart_tool/goldens".
   bool get doUpdateScreenshotGoldens => boolArg('update-screenshot-goldens');
 
-  /// Whether to fetch the goldens repo prior to running tests.
-  bool get skipGoldensRepoFetch => boolArg('skip-goldens-repo-fetch');
+  /// Path to a CanvasKit build. Overrides the default CanvasKit.
+  String? get overridePathToCanvasKit => argResults!['canvaskit-path'] as String?;
 
   @override
   Future<bool> run() async {
-    final BrowserEnvironment browserEnvironment = getBrowserEnvironment(browser);
-
     final List<FilePath> testFiles = runAllTests
           ? findAllTests()
           : targetFiles;
 
     final Pipeline testPipeline = Pipeline(steps: <PipelineStep>[
       if (isWatchMode) ClearTerminalScreenStep(),
-      CompileTestsStep(
-        skipGoldensRepoFetch: skipGoldensRepoFetch,
-        testFiles: testFiles,
-      ),
+      CompileTestsStep(testFiles: testFiles),
       RunTestsStep(
-        browserEnvironment: browserEnvironment,
+        browserName: browserName,
         testFiles: testFiles,
         isDebug: isDebug,
         doUpdateScreenshotGoldens: doUpdateScreenshotGoldens,
+        requireSkiaGold: requireSkiaGold,
+        overridePathToCanvasKit: overridePathToCanvasKit,
       ),
     ]);
     await testPipeline.run();

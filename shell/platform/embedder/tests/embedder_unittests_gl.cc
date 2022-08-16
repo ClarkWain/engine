@@ -2,19 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "tests/embedder_test_context.h"
 #define FML_USED_ON_EMBEDDER
 
+#include <atomic>
 #include <string>
 #include <vector>
 
-#include "embedder.h"
-#include "embedder_engine.h"
+#include "vulkan/vulkan.h"
+
 #include "flutter/flow/raster_cache.h"
 #include "flutter/fml/file.h"
 #include "flutter/fml/make_copyable.h"
 #include "flutter/fml/mapping.h"
 #include "flutter/fml/message_loop.h"
 #include "flutter/fml/message_loop_task_queues.h"
+#include "flutter/fml/native_library.h"
 #include "flutter/fml/paths.h"
 #include "flutter/fml/synchronization/count_down_latch.h"
 #include "flutter/fml/synchronization/waitable_event.h"
@@ -34,10 +37,18 @@
 #include "third_party/skia/src/gpu/gl/GrGLDefines.h"
 #include "third_party/tonic/converter/dart_converter.h"
 
+// CREATE_NATIVE_ENTRY is leaky by design
+// NOLINTBEGIN(clang-analyzer-core.StackAddressEscape)
+
 namespace flutter {
 namespace testing {
 
 using EmbedderTest = testing::EmbedderTest;
+
+TEST_F(EmbedderTest, CanGetVulkanEmbedderContext) {
+  auto& context = GetEmbedderContext(EmbedderTestContextType::kVulkanContext);
+  EmbedderConfigBuilder builder(context);
+}
 
 TEST_F(EmbedderTest, CanCreateOpenGLRenderingEngine) {
   EmbedderConfigBuilder builder(
@@ -1227,13 +1238,14 @@ TEST_F(EmbedderTest, CanRenderSceneWithoutCustomCompositorWithTransformation) {
       "scene_without_custom_compositor_with_xform.png", rendered_scene));
 }
 
-TEST_F(EmbedderTest, CanRenderGradientWithoutCompositor) {
-  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+TEST_P(EmbedderTestMultiBackend, CanRenderGradientWithoutCompositor) {
+  EmbedderTestContextType backend = GetParam();
+  auto& context = GetEmbedderContext(backend);
 
   EmbedderConfigBuilder builder(context);
 
   builder.SetDartEntrypoint("render_gradient");
-  builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+  builder.SetRendererConfig(backend, SkISize::Make(800, 600));
 
   auto rendered_scene = context.GetNextSceneImage();
 
@@ -1249,7 +1261,8 @@ TEST_F(EmbedderTest, CanRenderGradientWithoutCompositor) {
   ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
             kSuccess);
 
-  ASSERT_TRUE(ImageMatchesFixture("gradient.png", rendered_scene));
+  ASSERT_TRUE(ImageMatchesFixture(
+      FixtureNameForBackend(backend, "gradient.png"), rendered_scene));
 }
 
 TEST_F(EmbedderTest, CanRenderGradientWithoutCompositorWithXform) {
@@ -1285,16 +1298,16 @@ TEST_F(EmbedderTest, CanRenderGradientWithoutCompositorWithXform) {
   ASSERT_TRUE(ImageMatchesFixture("gradient_xform.png", rendered_scene));
 }
 
-TEST_F(EmbedderTest, CanRenderGradientWithCompositor) {
-  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+TEST_P(EmbedderTestMultiBackend, CanRenderGradientWithCompositor) {
+  EmbedderTestContextType backend = GetParam();
+  auto& context = GetEmbedderContext(backend);
 
   EmbedderConfigBuilder builder(context);
 
   builder.SetDartEntrypoint("render_gradient");
-  builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+  builder.SetRendererConfig(backend, SkISize::Make(800, 600));
   builder.SetCompositor();
-  builder.SetRenderTargetType(
-      EmbedderTestBackingStoreProducer::RenderTargetType::kOpenGLFramebuffer);
+  builder.SetRenderTargetType(GetRenderTargetFromBackend(backend, true));
 
   auto rendered_scene = context.GetNextSceneImage();
 
@@ -1310,7 +1323,8 @@ TEST_F(EmbedderTest, CanRenderGradientWithCompositor) {
   ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
             kSuccess);
 
-  ASSERT_TRUE(ImageMatchesFixture("gradient.png", rendered_scene));
+  ASSERT_TRUE(ImageMatchesFixture(
+      FixtureNameForBackend(backend, "gradient.png"), rendered_scene));
 }
 
 TEST_F(EmbedderTest, CanRenderGradientWithCompositorWithXform) {
@@ -1350,16 +1364,17 @@ TEST_F(EmbedderTest, CanRenderGradientWithCompositorWithXform) {
   ASSERT_TRUE(ImageMatchesFixture("gradient_xform.png", rendered_scene));
 }
 
-TEST_F(EmbedderTest, CanRenderGradientWithCompositorOnNonRootLayer) {
-  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+TEST_P(EmbedderTestMultiBackend,
+       CanRenderGradientWithCompositorOnNonRootLayer) {
+  EmbedderTestContextType backend = GetParam();
+  auto& context = GetEmbedderContext(backend);
 
   EmbedderConfigBuilder builder(context);
 
   builder.SetDartEntrypoint("render_gradient_on_non_root_backing_store");
-  builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+  builder.SetRendererConfig(backend, SkISize::Make(800, 600));
   builder.SetCompositor();
-  builder.SetRenderTargetType(
-      EmbedderTestBackingStoreProducer::RenderTargetType::kOpenGLFramebuffer);
+  builder.SetRenderTargetType(GetRenderTargetFromBackend(backend, true));
 
   context.GetCompositor().SetNextPresentCallback(
       [&](const FlutterLayer** layers, size_t layers_count) {
@@ -1368,9 +1383,8 @@ TEST_F(EmbedderTest, CanRenderGradientWithCompositorOnNonRootLayer) {
         // Layer Root
         {
           FlutterBackingStore backing_store = *layers[0]->backing_store;
-          backing_store.type = kFlutterBackingStoreTypeOpenGL;
           backing_store.did_update = true;
-          backing_store.open_gl.type = kFlutterOpenGLTargetTypeFramebuffer;
+          ConfigureBackingStore(backing_store, backend, true);
 
           FlutterLayer layer = {};
           layer.struct_size = sizeof(layer);
@@ -1401,9 +1415,8 @@ TEST_F(EmbedderTest, CanRenderGradientWithCompositorOnNonRootLayer) {
         // Layer 2
         {
           FlutterBackingStore backing_store = *layers[2]->backing_store;
-          backing_store.type = kFlutterBackingStoreTypeOpenGL;
           backing_store.did_update = true;
-          backing_store.open_gl.type = kFlutterOpenGLTargetTypeFramebuffer;
+          ConfigureBackingStore(backing_store, backend, true);
 
           FlutterLayer layer = {};
           layer.struct_size = sizeof(layer);
@@ -1452,7 +1465,8 @@ TEST_F(EmbedderTest, CanRenderGradientWithCompositorOnNonRootLayer) {
   ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
             kSuccess);
 
-  ASSERT_TRUE(ImageMatchesFixture("gradient.png", rendered_scene));
+  ASSERT_TRUE(ImageMatchesFixture(
+      FixtureNameForBackend(backend, "gradient.png"), rendered_scene));
 }
 
 TEST_F(EmbedderTest, CanRenderGradientWithCompositorOnNonRootLayerWithXform) {
@@ -1727,7 +1741,7 @@ TEST_F(EmbedderTest, CanCreateEmbedderWithCustomRenderTaskRunner) {
 /// Asserts that the render task runner can be the same as the platform task
 /// runner.
 ///
-TEST_F(EmbedderTest,
+TEST_P(EmbedderTestMultiBackend,
        CanCreateEmbedderWithCustomRenderTaskRunnerTheSameAsPlatformTaskRunner) {
   // A new thread needs to be created for the platform thread because the test
   // can't wait for assertions to be completed on the same thread that services
@@ -1749,10 +1763,10 @@ TEST_F(EmbedderTest,
       });
 
   platform_task_runner->PostTask([&]() {
-    EmbedderConfigBuilder builder(
-        GetEmbedderContext(EmbedderTestContextType::kOpenGLContext));
+    EmbedderTestContextType backend = GetParam();
+    EmbedderConfigBuilder builder(GetEmbedderContext(backend));
     builder.SetDartEntrypoint("can_render_scene_without_custom_compositor");
-    builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+    builder.SetRendererConfig(backend, SkISize::Make(800, 600));
     builder.SetRenderTaskRunner(
         &common_task_runner.GetFlutterTaskRunnerDescription());
     builder.SetPlatformTaskRunner(
@@ -1802,17 +1816,17 @@ TEST_F(EmbedderTest,
   }
 }
 
-TEST_F(EmbedderTest,
+TEST_P(EmbedderTestMultiBackend,
        CompositorMustBeAbleToRenderKnownScenePixelRatioOnSurface) {
-  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+  EmbedderTestContextType backend = GetParam();
+  auto& context = GetEmbedderContext(backend);
 
   EmbedderConfigBuilder builder(context);
-  builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+  builder.SetRendererConfig(backend, SkISize::Make(800, 600));
   builder.SetCompositor();
   builder.SetDartEntrypoint("can_display_platform_view_with_pixel_ratio");
 
-  builder.SetRenderTargetType(
-      EmbedderTestBackingStoreProducer::RenderTargetType::kOpenGLTexture);
+  builder.SetRenderTargetType(GetRenderTargetFromBackend(backend, false));
 
   fml::CountDownLatch latch(1);
 
@@ -1825,9 +1839,8 @@ TEST_F(EmbedderTest,
         // Layer 0 (Root)
         {
           FlutterBackingStore backing_store = *layers[0]->backing_store;
-          backing_store.type = kFlutterBackingStoreTypeOpenGL;
           backing_store.did_update = true;
-          backing_store.open_gl.type = kFlutterOpenGLTargetTypeTexture;
+          ConfigureBackingStore(backing_store, backend, false);
 
           FlutterLayer layer = {};
           layer.struct_size = sizeof(layer);
@@ -1858,9 +1871,8 @@ TEST_F(EmbedderTest,
         // Layer 2
         {
           FlutterBackingStore backing_store = *layers[2]->backing_store;
-          backing_store.type = kFlutterBackingStoreTypeOpenGL;
           backing_store.did_update = true;
-          backing_store.open_gl.type = kFlutterOpenGLTargetTypeTexture;
+          ConfigureBackingStore(backing_store, backend, false);
 
           FlutterLayer layer = {};
           layer.struct_size = sizeof(layer);
@@ -1889,7 +1901,8 @@ TEST_F(EmbedderTest,
 
   latch.Wait();
 
-  ASSERT_TRUE(ImageMatchesFixture("dpr_noxform.png", rendered_scene));
+  ASSERT_TRUE(ImageMatchesFixture(
+      FixtureNameForBackend(backend, "dpr_noxform.png"), rendered_scene));
 }
 
 TEST_F(
@@ -2018,8 +2031,7 @@ TEST_F(EmbedderTest,
 
   constexpr size_t frames_expected = 10;
   fml::CountDownLatch frame_latch(frames_expected);
-  static size_t frames_seen;
-  frames_seen = 0;
+  std::atomic_size_t frames_seen = 0;
   context.AddNativeCallback("SignalNativeTest",
                             CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
                               frames_seen++;
@@ -2027,7 +2039,7 @@ TEST_F(EmbedderTest,
                             }));
   frame_latch.Wait();
 
-  ASSERT_EQ(frames_expected, frames_seen);
+  ASSERT_GE(frames_seen, frames_expected);
 
   FlutterEngineShutdown(engine.release());
 }
@@ -2059,8 +2071,7 @@ TEST_F(EmbedderTest,
 
   constexpr size_t frames_expected = 10;
   fml::CountDownLatch frame_latch(frames_expected);
-  static size_t frames_seen;
-  frames_seen = 0;
+  std::atomic_size_t frames_seen = 0;
   context.AddNativeCallback("SignalNativeTest",
                             CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
                               frames_seen++;
@@ -2068,21 +2079,21 @@ TEST_F(EmbedderTest,
                             }));
   frame_latch.Wait();
 
-  ASSERT_EQ(frames_expected, frames_seen);
+  ASSERT_GE(frames_seen, frames_expected);
 
   FlutterEngineShutdown(engine.release());
 }
 
-TEST_F(EmbedderTest, PlatformViewMutatorsAreValid) {
-  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+TEST_P(EmbedderTestMultiBackend, PlatformViewMutatorsAreValid) {
+  EmbedderTestContextType backend = GetParam();
+  auto& context = GetEmbedderContext(backend);
 
   EmbedderConfigBuilder builder(context);
-  builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+  builder.SetRendererConfig(backend, SkISize::Make(800, 600));
   builder.SetCompositor();
   builder.SetDartEntrypoint("platform_view_mutators");
 
-  builder.SetRenderTargetType(
-      EmbedderTestBackingStoreProducer::RenderTargetType::kOpenGLTexture);
+  builder.SetRenderTargetType(GetRenderTargetFromBackend(backend, false));
 
   fml::CountDownLatch latch(1);
   context.GetCompositor().SetNextPresentCallback(
@@ -2092,9 +2103,8 @@ TEST_F(EmbedderTest, PlatformViewMutatorsAreValid) {
         // Layer 0 (Root)
         {
           FlutterBackingStore backing_store = *layers[0]->backing_store;
-          backing_store.type = kFlutterBackingStoreTypeOpenGL;
           backing_store.did_update = true;
-          backing_store.open_gl.type = kFlutterOpenGLTargetTypeTexture;
+          ConfigureBackingStore(backing_store, backend, false);
 
           FlutterLayer layer = {};
           layer.struct_size = sizeof(layer);
@@ -2449,8 +2459,8 @@ TEST_F(EmbedderTest, ArcEndCapsAreDrawnCorrectly) {
 
   FlutterWindowMetricsEvent event = {};
   event.struct_size = sizeof(event);
-  event.width = 1024;
-  event.height = 800;
+  event.width = 800;
+  event.height = 1024;
   event.pixel_ratio = 1.0;
   ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
             kSuccess);
@@ -2984,7 +2994,7 @@ TEST_F(EmbedderTest, CompositorRenderTargetsAreInStableOrder) {
       [&](const FlutterLayer** layers, size_t layers_count) {
         ASSERT_EQ(layers_count, 20u);
 
-        if (first_frame_backing_store_user_data.size() == 0u) {
+        if (first_frame_backing_store_user_data.empty()) {
           for (size_t i = 0; i < layers_count; ++i) {
             if (layers[i]->type == kFlutterLayerContentTypeBackingStore) {
               first_frame_backing_store_user_data.push_back(
@@ -3045,7 +3055,7 @@ TEST_F(EmbedderTest, FrameInfoContainsValidWidthAndHeight) {
   auto engine = builder.LaunchEngine();
 
   // Send a window metrics events so frames may be scheduled.
-  FlutterWindowMetricsEvent event = {};
+  static FlutterWindowMetricsEvent event = {};
   event.struct_size = sizeof(event);
   event.width = 1024;
   event.height = 600;
@@ -3054,7 +3064,7 @@ TEST_F(EmbedderTest, FrameInfoContainsValidWidthAndHeight) {
             kSuccess);
   ASSERT_TRUE(engine.is_valid());
 
-  fml::CountDownLatch frame_latch(10);
+  static fml::CountDownLatch frame_latch(10);
 
   context.AddNativeCallback("SignalNativeTest",
                             CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
@@ -3062,7 +3072,7 @@ TEST_F(EmbedderTest, FrameInfoContainsValidWidthAndHeight) {
                             }));
 
   static_cast<EmbedderTestContextGL&>(context).SetGLGetFBOCallback(
-      [&event, &frame_latch](FlutterFrameInfo frame_info) {
+      [](FlutterFrameInfo frame_info) {
         // width and height are rotated by 90 deg
         ASSERT_EQ(frame_info.size.width, event.height);
         ASSERT_EQ(frame_info.size.height, event.width);
@@ -3095,6 +3105,72 @@ TEST_F(EmbedderTest, MustNotRunWithBothPresentCallbacksSet) {
   ASSERT_FALSE(engine.is_valid());
 }
 
+TEST_F(EmbedderTest, MustStillRunWhenPopulateExistingDamageIsNotProvided) {
+  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+
+  EmbedderConfigBuilder builder(context);
+  builder.SetOpenGLRendererConfig(SkISize::Make(1, 1));
+  builder.GetRendererConfig().open_gl.populate_existing_damage = nullptr;
+
+  auto engine = builder.LaunchEngine();
+  ASSERT_TRUE(engine.is_valid());
+}
+
+TEST_F(EmbedderTest, MustRunWhenPopulateExistingDamageIsProvided) {
+  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+
+  EmbedderConfigBuilder builder(context);
+  builder.SetOpenGLRendererConfig(SkISize::Make(1, 1));
+
+  builder.GetRendererConfig().open_gl.populate_existing_damage =
+      [](void* context, const intptr_t id,
+         FlutterDamage* existing_damage) -> void {
+    return reinterpret_cast<EmbedderTestContextGL*>(context)
+        ->GLPopulateExistingDamage(id, existing_damage);
+  };
+
+  auto engine = builder.LaunchEngine();
+  ASSERT_TRUE(engine.is_valid());
+}
+
+TEST_F(EmbedderTest, MustRunWithPopulateExistingDamageAndFBOCallback) {
+  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+
+  EmbedderConfigBuilder builder(context);
+  builder.SetOpenGLRendererConfig(SkISize::Make(1, 1));
+  builder.GetRendererConfig().open_gl.fbo_callback =
+      [](void* context) -> uint32_t { return 0; };
+  builder.GetRendererConfig().open_gl.fbo_with_frame_info_callback = nullptr;
+  builder.GetRendererConfig().open_gl.populate_existing_damage =
+      [](void* context, const intptr_t id,
+         FlutterDamage* existing_damage) -> void {
+    return reinterpret_cast<EmbedderTestContextGL*>(context)
+        ->GLPopulateExistingDamage(id, existing_damage);
+  };
+
+  auto engine = builder.LaunchEngine();
+  ASSERT_TRUE(engine.is_valid());
+}
+
+TEST_F(EmbedderTest,
+       MustNotRunWhenPopulateExistingDamageButNoOtherFBOCallback) {
+  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+
+  EmbedderConfigBuilder builder(context);
+  builder.SetOpenGLRendererConfig(SkISize::Make(1, 1));
+  builder.GetRendererConfig().open_gl.fbo_callback = nullptr;
+  builder.GetRendererConfig().open_gl.fbo_with_frame_info_callback = nullptr;
+  builder.GetRendererConfig().open_gl.populate_existing_damage =
+      [](void* context, const intptr_t id,
+         FlutterDamage* existing_damage) -> void {
+    return reinterpret_cast<EmbedderTestContextGL*>(context)
+        ->GLPopulateExistingDamage(id, existing_damage);
+  };
+
+  auto engine = builder.LaunchEngine();
+  ASSERT_FALSE(engine.is_valid());
+}
+
 TEST_F(EmbedderTest, PresentInfoContainsValidFBOId) {
   auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
 
@@ -3119,7 +3195,7 @@ TEST_F(EmbedderTest, PresentInfoContainsValidFBOId) {
             kSuccess);
   ASSERT_TRUE(engine.is_valid());
 
-  fml::CountDownLatch frame_latch(10);
+  static fml::CountDownLatch frame_latch(10);
 
   context.AddNativeCallback("SignalNativeTest",
                             CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
@@ -3129,13 +3205,322 @@ TEST_F(EmbedderTest, PresentInfoContainsValidFBOId) {
   const uint32_t window_fbo_id =
       static_cast<EmbedderTestContextGL&>(context).GetWindowFBOId();
   static_cast<EmbedderTestContextGL&>(context).SetGLPresentCallback(
-      [window_fbo_id = window_fbo_id, &frame_latch](uint32_t fbo_id) {
-        ASSERT_EQ(fbo_id, window_fbo_id);
+      [window_fbo_id = window_fbo_id](FlutterPresentInfo present_info) {
+        ASSERT_EQ(present_info.fbo_id, window_fbo_id);
 
         frame_latch.CountDown();
       });
 
   frame_latch.Wait();
+}
+
+TEST_F(EmbedderTest,
+       PresentInfoReceivesFullDamageWhenExistingDamageIsWholeScreen) {
+  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+
+  EmbedderConfigBuilder builder(context);
+  builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+  builder.SetDartEntrypoint("render_gradient");
+  builder.GetRendererConfig().open_gl.populate_existing_damage =
+      [](void* context, const intptr_t id,
+         FlutterDamage* existing_damage) -> void {
+    return reinterpret_cast<EmbedderTestContextGL*>(context)
+        ->GLPopulateExistingDamage(id, existing_damage);
+  };
+
+  // Return existing damage as the entire screen on purpose.
+  static_cast<EmbedderTestContextGL&>(context)
+      .SetGLPopulateExistingDamageCallback(
+          [](const intptr_t id, FlutterDamage* existing_damage_ptr) {
+            const size_t num_rects = 1;
+            FlutterRect existing_damage_rects[num_rects] = {
+                FlutterRect{0, 0, 800, 600}};
+            existing_damage_ptr->num_rects = num_rects;
+            existing_damage_ptr->damage = existing_damage_rects;
+          });
+
+  auto engine = builder.LaunchEngine();
+  ASSERT_TRUE(engine.is_valid());
+
+  // First frame should be entirely rerendered.
+  static_cast<EmbedderTestContextGL&>(context).SetGLPresentCallback(
+      [](FlutterPresentInfo present_info) {
+        const size_t num_rects = 1;
+        ASSERT_EQ(present_info.frame_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.frame_damage.damage->left, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->top, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->right, 800);
+        ASSERT_EQ(present_info.frame_damage.damage->bottom, 600);
+
+        ASSERT_EQ(present_info.buffer_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.buffer_damage.damage->left, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->top, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->right, 800);
+        ASSERT_EQ(present_info.buffer_damage.damage->bottom, 600);
+      });
+
+  // Send a window metrics events so frames may be scheduled.
+  FlutterWindowMetricsEvent event = {};
+  event.struct_size = sizeof(event);
+  event.width = 800;
+  event.height = 600;
+  event.pixel_ratio = 1.0;
+  ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
+            kSuccess);
+
+  // Because it's the same as the first frame, the second frame damage should
+  // be empty but, because there was a full existing buffer damage, the buffer
+  // damage should be the entire screen.
+  static_cast<EmbedderTestContextGL&>(context).SetGLPresentCallback(
+      [](FlutterPresentInfo present_info) {
+        const size_t num_rects = 1;
+        ASSERT_EQ(present_info.frame_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.frame_damage.damage->left, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->top, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->right, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->bottom, 0);
+
+        ASSERT_EQ(present_info.buffer_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.buffer_damage.damage->left, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->top, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->right, 800);
+        ASSERT_EQ(present_info.buffer_damage.damage->bottom, 600);
+      });
+
+  ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
+            kSuccess);
+}
+
+TEST_F(EmbedderTest, PresentInfoReceivesEmptyDamage) {
+  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+
+  EmbedderConfigBuilder builder(context);
+  builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+  builder.SetDartEntrypoint("render_gradient");
+  builder.GetRendererConfig().open_gl.populate_existing_damage =
+      [](void* context, const intptr_t id,
+         FlutterDamage* existing_damage) -> void {
+    return reinterpret_cast<EmbedderTestContextGL*>(context)
+        ->GLPopulateExistingDamage(id, existing_damage);
+  };
+
+  // Return no existing damage on purpose.
+  static_cast<EmbedderTestContextGL&>(context)
+      .SetGLPopulateExistingDamageCallback(
+          [](const intptr_t id, FlutterDamage* existing_damage_ptr) {
+            const size_t num_rects = 1;
+            FlutterRect existing_damage_rects[num_rects] = {
+                FlutterRect{0, 0, 0, 0}};
+            existing_damage_ptr->num_rects = num_rects;
+            existing_damage_ptr->damage = existing_damage_rects;
+          });
+
+  auto engine = builder.LaunchEngine();
+  ASSERT_TRUE(engine.is_valid());
+
+  // First frame should be entirely rerendered.
+  static_cast<EmbedderTestContextGL&>(context).SetGLPresentCallback(
+      [](FlutterPresentInfo present_info) {
+        const size_t num_rects = 1;
+        ASSERT_EQ(present_info.frame_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.frame_damage.damage->left, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->top, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->right, 800);
+        ASSERT_EQ(present_info.frame_damage.damage->bottom, 600);
+
+        ASSERT_EQ(present_info.buffer_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.buffer_damage.damage->left, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->top, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->right, 800);
+        ASSERT_EQ(present_info.buffer_damage.damage->bottom, 600);
+      });
+
+  // Send a window metrics events so frames may be scheduled.
+  FlutterWindowMetricsEvent event = {};
+  event.struct_size = sizeof(event);
+  event.width = 800;
+  event.height = 600;
+  event.pixel_ratio = 1.0;
+  ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
+            kSuccess);
+
+  // Because it's the same as the first frame, the second frame should not be
+  // rerendered assuming there is no existing damage.
+  static_cast<EmbedderTestContextGL&>(context).SetGLPresentCallback(
+      [](FlutterPresentInfo present_info) {
+        const size_t num_rects = 1;
+        ASSERT_EQ(present_info.frame_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.frame_damage.damage->left, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->top, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->right, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->bottom, 0);
+
+        ASSERT_EQ(present_info.buffer_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.buffer_damage.damage->left, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->top, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->right, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->bottom, 0);
+      });
+
+  ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
+            kSuccess);
+}
+
+TEST_F(EmbedderTest, PresentInfoReceivesPartialDamage) {
+  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+
+  EmbedderConfigBuilder builder(context);
+  builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+  builder.SetDartEntrypoint("render_gradient");
+  builder.GetRendererConfig().open_gl.populate_existing_damage =
+      [](void* context, const intptr_t id,
+         FlutterDamage* existing_damage) -> void {
+    return reinterpret_cast<EmbedderTestContextGL*>(context)
+        ->GLPopulateExistingDamage(id, existing_damage);
+  };
+
+  // Return existing damage as only part of the screen on purpose.
+  static_cast<EmbedderTestContextGL&>(context)
+      .SetGLPopulateExistingDamageCallback(
+          [](const intptr_t id, FlutterDamage* existing_damage_ptr) {
+            const size_t num_rects = 1;
+            FlutterRect existing_damage_rects[num_rects] = {
+                FlutterRect{200, 150, 400, 300}};
+            existing_damage_ptr->num_rects = num_rects;
+            existing_damage_ptr->damage = existing_damage_rects;
+          });
+
+  auto engine = builder.LaunchEngine();
+  ASSERT_TRUE(engine.is_valid());
+
+  // First frame should be entirely rerendered.
+  static_cast<EmbedderTestContextGL&>(context).SetGLPresentCallback(
+      [](FlutterPresentInfo present_info) {
+        const size_t num_rects = 1;
+        ASSERT_EQ(present_info.frame_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.frame_damage.damage->left, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->top, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->right, 800);
+        ASSERT_EQ(present_info.frame_damage.damage->bottom, 600);
+
+        ASSERT_EQ(present_info.buffer_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.buffer_damage.damage->left, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->top, 0);
+        ASSERT_EQ(present_info.buffer_damage.damage->right, 800);
+        ASSERT_EQ(present_info.buffer_damage.damage->bottom, 600);
+      });
+
+  // Send a window metrics events so frames may be scheduled.
+  FlutterWindowMetricsEvent event = {};
+  event.struct_size = sizeof(event);
+  event.width = 800;
+  event.height = 600;
+  event.pixel_ratio = 1.0;
+  ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
+            kSuccess);
+
+  // Because it's the same as the first frame, the second frame damage should be
+  // empty but, because there was a partial existing damage, the buffer damage
+  // should represent that partial damage area.
+  static_cast<EmbedderTestContextGL&>(context).SetGLPresentCallback(
+      [](FlutterPresentInfo present_info) {
+        const size_t num_rects = 1;
+        ASSERT_EQ(present_info.frame_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.frame_damage.damage->left, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->top, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->right, 0);
+        ASSERT_EQ(present_info.frame_damage.damage->bottom, 0);
+
+        ASSERT_EQ(present_info.buffer_damage.num_rects, num_rects);
+        ASSERT_EQ(present_info.buffer_damage.damage->left, 200);
+        ASSERT_EQ(present_info.buffer_damage.damage->top, 150);
+        ASSERT_EQ(present_info.buffer_damage.damage->right, 400);
+        ASSERT_EQ(present_info.buffer_damage.damage->bottom, 300);
+      });
+
+  ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
+            kSuccess);
+}
+
+TEST_F(EmbedderTest, PopulateExistingDamageReceivesValidID) {
+  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+
+  EmbedderConfigBuilder builder(context);
+  builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+  builder.SetDartEntrypoint("render_gradient");
+  builder.GetRendererConfig().open_gl.populate_existing_damage =
+      [](void* context, const intptr_t id,
+         FlutterDamage* existing_damage) -> void {
+    return reinterpret_cast<EmbedderTestContextGL*>(context)
+        ->GLPopulateExistingDamage(id, existing_damage);
+  };
+
+  auto engine = builder.LaunchEngine();
+  ASSERT_TRUE(engine.is_valid());
+
+  const uint32_t window_fbo_id =
+      static_cast<EmbedderTestContextGL&>(context).GetWindowFBOId();
+  static_cast<EmbedderTestContextGL&>(context)
+      .SetGLPopulateExistingDamageCallback(
+          [window_fbo_id = window_fbo_id](intptr_t id,
+                                          FlutterDamage* existing_damage) {
+            ASSERT_EQ(id, window_fbo_id);
+          });
+
+  // Send a window metrics events so frames may be scheduled.
+  FlutterWindowMetricsEvent event = {};
+  event.struct_size = sizeof(event);
+  event.width = 800;
+  event.height = 600;
+  event.pixel_ratio = 1.0;
+  ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
+            kSuccess);
+}
+
+TEST_F(EmbedderTest, PopulateExistingDamageReceivesInvalidID) {
+  auto& context = GetEmbedderContext(EmbedderTestContextType::kOpenGLContext);
+
+  EmbedderConfigBuilder builder(context);
+  builder.SetOpenGLRendererConfig(SkISize::Make(800, 600));
+  builder.SetDartEntrypoint("render_gradient");
+  builder.GetRendererConfig().open_gl.populate_existing_damage =
+      [](void* context, const intptr_t id,
+         FlutterDamage* existing_damage) -> void {
+    return reinterpret_cast<EmbedderTestContextGL*>(context)
+        ->GLPopulateExistingDamage(id, existing_damage);
+  };
+
+  // Return a bad FBO ID on purpose.
+  builder.GetRendererConfig().open_gl.fbo_with_frame_info_callback =
+      [](void* context, const FlutterFrameInfo* frame_info) -> uint32_t {
+    return 123;
+  };
+
+  auto engine = builder.LaunchEngine();
+  ASSERT_TRUE(engine.is_valid());
+
+  context.AddNativeCallback("SignalNativeTest",
+                            CREATE_NATIVE_ENTRY([&](Dart_NativeArguments args) {
+                              /* Nothing to do. */
+                            }));
+
+  const uint32_t window_fbo_id =
+      static_cast<EmbedderTestContextGL&>(context).GetWindowFBOId();
+  static_cast<EmbedderTestContextGL&>(context)
+      .SetGLPopulateExistingDamageCallback(
+          [window_fbo_id = window_fbo_id](intptr_t id,
+                                          FlutterDamage* existing_damage) {
+            ASSERT_NE(id, window_fbo_id);
+          });
+
+  // Send a window metrics events so frames may be scheduled.
+  FlutterWindowMetricsEvent event = {};
+  event.struct_size = sizeof(event);
+  event.width = 800;
+  event.height = 600;
+  event.pixel_ratio = 1.0;
+  ASSERT_EQ(FlutterEngineSendWindowMetricsEvent(engine.get(), &event),
+            kSuccess);
 }
 
 TEST_F(EmbedderTest, SetSingleDisplayConfigurationWithDisplayId) {
@@ -3442,7 +3827,7 @@ TEST_F(EmbedderTest, SnapshotRenderTargetScalesDownToDriverMax) {
 
         CanvasImage* small_image = get_arg(1);
         ASSERT_TRUE(ImageMatchesFixture("snapshot_large_scene.png",
-                                        small_image->image()));
+                                        small_image->image()->skia_image()));
 
         latch.Signal();
       })));
@@ -3680,5 +4065,13 @@ TEST_F(EmbedderTest, ExternalTextureGLRefreshedTooOften) {
   EXPECT_TRUE(resolve_called);
 }
 
+INSTANTIATE_TEST_SUITE_P(
+    EmbedderTestGlVk,
+    EmbedderTestMultiBackend,
+    ::testing::Values(EmbedderTestContextType::kOpenGLContext,
+                      EmbedderTestContextType::kVulkanContext));
+
 }  // namespace testing
 }  // namespace flutter
+
+// NOLINTEND(clang-analyzer-core.StackAddressEscape)

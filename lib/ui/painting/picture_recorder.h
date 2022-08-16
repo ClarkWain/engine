@@ -5,13 +5,9 @@
 #ifndef FLUTTER_LIB_UI_PAINTING_PICTURE_RECORDER_H_
 #define FLUTTER_LIB_UI_PAINTING_PICTURE_RECORDER_H_
 
-#include "flutter/flow/display_list_canvas.h"
+#include "flutter/display_list/display_list_canvas_recorder.h"
 #include "flutter/lib/ui/dart_wrapper.h"
 #include "third_party/skia/include/core/SkPictureRecorder.h"
-
-namespace tonic {
-class DartLibraryNatives;
-}  // namespace tonic
 
 namespace flutter {
 class Canvas;
@@ -22,7 +18,7 @@ class PictureRecorder : public RefCountedDartWrappable<PictureRecorder> {
   FML_FRIEND_MAKE_REF_COUNTED(PictureRecorder);
 
  public:
-  static fml::RefPtr<PictureRecorder> Create();
+  static void Create(Dart_Handle wrapper);
 
   ~PictureRecorder() override;
 
@@ -35,13 +31,8 @@ class PictureRecorder : public RefCountedDartWrappable<PictureRecorder> {
 
   void set_canvas(fml::RefPtr<Canvas> canvas) { canvas_ = std::move(canvas); }
 
-  static void RegisterNatives(tonic::DartLibraryNatives* natives);
-
  private:
   PictureRecorder();
-
-  SkRTreeFactory rtree_factory_;
-  SkPictureRecorder picture_recorder_;
 
   sk_sp<DisplayListCanvasRecorder> display_list_recorder_;
 

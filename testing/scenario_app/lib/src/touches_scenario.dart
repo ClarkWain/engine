@@ -12,6 +12,9 @@ class TouchesScenario extends Scenario {
   /// Constructor for `TouchesScenario`.
   TouchesScenario(PlatformDispatcher dispatcher) : super(dispatcher);
 
+  final Map<int, int> _knownDevices = <int, int>{};
+  int _sequenceNo = 0;
+
   @override
   void onBeginFrame(Duration duration) {
     // It is necessary to render frames for touch events to work properly on iOS
@@ -23,13 +26,16 @@ class TouchesScenario extends Scenario {
   @override
   void onPointerDataPacket(PointerDataPacket packet) {
     for (final PointerData datum in packet.data) {
+      final int deviceId =
+          _knownDevices.putIfAbsent(datum.device, () => _knownDevices.length);
       sendJsonMessage(
         dispatcher: dispatcher,
         channel: 'display_data',
         json: <String, dynamic>{
-          'data': datum.change.toString() + ':' + datum.buttons.toString(),
+          'data': '$_sequenceNo,${datum.change},device=$deviceId,buttons=${datum.buttons}',
         },
       );
+      _sequenceNo++;
     }
   }
 }

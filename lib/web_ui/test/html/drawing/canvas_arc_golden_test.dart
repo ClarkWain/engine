@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:html' as html;
 import 'dart:math' as math;
 import 'package:test/bootstrap/browser.dart';
 import 'package:test/test.dart';
@@ -29,25 +28,21 @@ Future<void> testMain() async {
   });
 
   test('draws arcs with largeArc , anticlockwise variations', () async {
-    paintArc(canvas, const Offset(0, 0),
-        largeArc: false, clockwise: false, distance: 20);
+    paintArc(canvas, Offset.zero, distance: 20);
     paintArc(canvas, const Offset(200, 0),
-        largeArc: true, clockwise: false, distance: 20);
-    paintArc(canvas, const Offset(0, 150),
-        largeArc: false, clockwise: true, distance: 20);
+        largeArc: true, distance: 20);
+    paintArc(canvas, const Offset(0, 150), clockwise: true, distance: 20);
     paintArc(canvas, const Offset(200, 150),
         largeArc: true, clockwise: true, distance: 20);
-    paintArc(canvas, const Offset(0, 300),
-        largeArc: false, clockwise: false, distance: -20);
+    paintArc(canvas, const Offset(0, 300), distance: -20);
     paintArc(canvas, const Offset(200, 300),
-        largeArc: true, clockwise: false, distance: -20);
-    paintArc(canvas, const Offset(0, 400),
-        largeArc: false, clockwise: true, distance: -20);
+        largeArc: true, distance: -20);
+    paintArc(canvas, const Offset(0, 400), clockwise: true, distance: -20);
     paintArc(canvas, const Offset(200, 400),
         largeArc: true, clockwise: true, distance: -20);
 
 
-    html.document.body!.append(canvas.rootElement);
+    domDocument.body!.append(canvas.rootElement);
     await matchGoldenFile('canvas_arc_to_point.png', region: region);
   });
 
@@ -62,7 +57,7 @@ Future<void> testMain() async {
       ..color = const Color(0xFFFF9800) // orange
       ..style = PaintingStyle.fill);
 
-    html.document.body!.append(canvas.rootElement);
+    domDocument.body!.append(canvas.rootElement);
     await matchGoldenFile('canvas_addarc.png', region: region);
   });
 
@@ -80,7 +75,7 @@ Future<void> testMain() async {
       ..color = const Color(0xFFFF9800) // orange
       ..style = PaintingStyle.fill);
 
-    html.document.body!.append(canvas.rootElement);
+    domDocument.body!.append(canvas.rootElement);
     await matchGoldenFile('canvas_addarc_ccw.png', region: region);
   });
 }

@@ -47,6 +47,7 @@ Future<void> main(List<String> args) async {
   await cipdConfigFile.writeAsString('''
 package: flutter/web/canvaskit_bundle
 description: A build of CanvasKit bundled with Flutter Web apps
+preserve_writable: true
 data:
   - dir: canvaskit
 ''');
@@ -63,7 +64,7 @@ data:
     canvaskitDirectory.path,
     'result.json',
   )).readAsStringSync()) as Map<String, dynamic>;
-  final String cipdInstanceId = cipdResult['result']['instance_id'] as String;
+  final String cipdInstanceId = (cipdResult['result'] as Map<dynamic, dynamic>)['instance_id'] as String;
 
   print('CIPD instance information:');
   final String cipdInfo = await evalProcess('cipd', <String>[
@@ -104,7 +105,7 @@ Future<void> _updateDepsFile(String cipdInstanceId) async {
 
   final String originalDepsCode = await depsFile.readAsString();
   final List<String> rewrittenDepsCode = <String>[];
-  const String kCanvasKitDependencyKeyInDeps = '\'canvaskit_cipd_instance\': \'';
+  const String kCanvasKitDependencyKeyInDeps = "'canvaskit_cipd_instance': '";
   bool canvaskitDependencyFound = false;
   for (final String line in originalDepsCode.split('\n')) {
     if (line.trim().startsWith(kCanvasKitDependencyKeyInDeps)) {
@@ -123,7 +124,7 @@ Future<void> _updateDepsFile(String cipdInstanceId) async {
       'Could not to locate CanvasKit dependency in the DEPS file. Make sure the '
       'DEPS file contains a line like this:\n'
       '\n'
-      '  \'canvaskit_cipd_instance\': \'SOME_VALUE\','
+      "  'canvaskit_cipd_instance': 'SOME_VALUE',"
     );
     exit(1);
   }
@@ -132,11 +133,11 @@ Future<void> _updateDepsFile(String cipdInstanceId) async {
 }
 
 Future<void> _updateCanvaskitInitializationCode(String canvaskitVersion) async {
-  const String kCanvasKitVersionKey = 'const String canvaskitVersion';
-  const String kPathToInitializationCode = 'lib/src/engine/canvaskit/initialization.dart';
+  const String kCanvasKitVersionKey = 'const String _canvaskitVersion';
+  const String kPathToConfigurationCode = 'lib/src/engine/configuration.dart';
   final File initializationFile = File(pathlib.join(
     environment.webUiRootDir.path,
-    kPathToInitializationCode,
+    kPathToConfigurationCode,
   ));
   final String originalInitializationCode = await initializationFile.readAsString();
 
@@ -146,7 +147,7 @@ Future<void> _updateCanvaskitInitializationCode(String canvaskitVersion) async {
     if (line.trim().startsWith(kCanvasKitVersionKey)) {
       canvaskitVersionFound = true;
       rewrittenCode.add(
-        "const String canvaskitVersion = '$canvaskitVersion';",
+        "const String _canvaskitVersion = '$canvaskitVersion';",
       );
     } else {
       rewrittenCode.add(line);
@@ -155,11 +156,11 @@ Future<void> _updateCanvaskitInitializationCode(String canvaskitVersion) async {
 
   if (!canvaskitVersionFound) {
     stderr.writeln(
-      'Failed to update CanvasKit version in $kPathToInitializationCode.\n'
+      'Failed to update CanvasKit version in $kPathToConfigurationCode.\n'
       'Could not to locate the constant that defines the version. Make sure the '
-      '$kPathToInitializationCode file contains a line like this:\n'
+      '$kPathToConfigurationCode file contains a line like this:\n'
       '\n'
-      'const String canvaskitVersion = \'VERSION\';'
+      "const String _canvaskitVersion = 'VERSION';"
     );
     exit(1);
   }

@@ -4,7 +4,7 @@
 
 #include "flutter/shell/common/shell_test_platform_view_gl.h"
 
-#include "flutter/shell/gpu/gpu_surface_gl.h"
+#include "flutter/shell/gpu/gpu_surface_gl_skia.h"
 
 namespace flutter {
 namespace testing {
@@ -35,7 +35,7 @@ void ShellTestPlatformViewGL::SimulateVSync() {
 
 // |PlatformView|
 std::unique_ptr<Surface> ShellTestPlatformViewGL::CreateRenderingSurface() {
-  return std::make_unique<GPUSurfaceGL>(this, true);
+  return std::make_unique<GPUSurfaceGLSkia>(this, true);
 }
 
 // |PlatformView|
@@ -63,13 +63,16 @@ bool ShellTestPlatformViewGL::GLContextClearCurrent() {
 }
 
 // |GPUSurfaceGLDelegate|
-bool ShellTestPlatformViewGL::GLContextPresent(uint32_t fbo_id) {
+bool ShellTestPlatformViewGL::GLContextPresent(
+    const GLPresentInfo& present_info) {
   return gl_surface_.Present();
 }
 
 // |GPUSurfaceGLDelegate|
-intptr_t ShellTestPlatformViewGL::GLContextFBO(GLFrameInfo frame_info) const {
-  return gl_surface_.GetFramebuffer(frame_info.width, frame_info.height);
+GLFBOInfo ShellTestPlatformViewGL::GLContextFBO(GLFrameInfo frame_info) const {
+  return GLFBOInfo{
+      .fbo_id = gl_surface_.GetFramebuffer(frame_info.width, frame_info.height),
+  };
 }
 
 // |GPUSurfaceGLDelegate|

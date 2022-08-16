@@ -60,6 +60,10 @@ void testMain() {
     final Completer<void> completer = Completer<void>();
     scheduleMicrotask(() { log.add('before drain, microtask'); });
     log.add('before drain');
+
+    // Ignoring the returned future because the completion of the drain is
+    // communicated using the `completer`.
+    // ignore: unawaited_futures
     buffers.drain(channel, (ByteData? drainedData, ui.PlatformMessageResponseCallback drainedCallback) async {
       log.add('callback');
       completer.complete();
@@ -168,7 +172,7 @@ void testMain() {
       didCallCallback = true;
     }
     void twoCallback(ByteData? responseData) {
-      throw TestFailure('wrong callback called');
+      throw TestFailure('wrong callback called'); // ignore: only_throw_errors
     }
     _resize(buffers, channel, 100);
     buffers.push(channel, one, oneCallback);
@@ -189,7 +193,7 @@ void testMain() {
       didCallCallback = true;
     }
     void twoCallback(ByteData? responseData) {
-      throw TestFailure('wrong callback called');
+      throw TestFailure('wrong callback called'); // ignore: only_throw_errors
     }
     _resize(buffers, channel, 1);
     buffers.push(channel, one, oneCallback);

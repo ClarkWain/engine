@@ -19,53 +19,7 @@ namespace flutter {
 
 typedef CanvasPath Path;
 
-static void Path_constructor(Dart_NativeArguments args) {
-  UIDartState::ThrowIfUIOperationsProhibited();
-  DartCallConstructor(&CanvasPath::CreateNew, args);
-}
-
 IMPLEMENT_WRAPPERTYPEINFO(ui, Path);
-
-#define FOR_EACH_BINDING(V)          \
-  V(Path, addArc)                    \
-  V(Path, addOval)                   \
-  V(Path, addPath)                   \
-  V(Path, addPolygon)                \
-  V(Path, addRect)                   \
-  V(Path, addRRect)                  \
-  V(Path, arcTo)                     \
-  V(Path, arcToPoint)                \
-  V(Path, close)                     \
-  V(Path, conicTo)                   \
-  V(Path, contains)                  \
-  V(Path, cubicTo)                   \
-  V(Path, extendWithPath)            \
-  V(Path, extendWithPathAndMatrix)   \
-  V(Path, getFillType)               \
-  V(Path, lineTo)                    \
-  V(Path, moveTo)                    \
-  V(Path, quadraticBezierTo)         \
-  V(Path, relativeArcToPoint)        \
-  V(Path, relativeConicTo)           \
-  V(Path, relativeCubicTo)           \
-  V(Path, relativeLineTo)            \
-  V(Path, relativeMoveTo)            \
-  V(Path, relativeQuadraticBezierTo) \
-  V(Path, reset)                     \
-  V(Path, setFillType)               \
-  V(Path, shift)                     \
-  V(Path, transform)                 \
-  V(Path, getBounds)                 \
-  V(Path, addPathWithMatrix)         \
-  V(Path, op)                        \
-  V(Path, clone)
-
-FOR_EACH_BINDING(DART_NATIVE_CALLBACK)
-
-void CanvasPath::RegisterNatives(tonic::DartLibraryNatives* natives) {
-  natives->Register({{"Path_constructor", Path_constructor, 1, true},
-                     FOR_EACH_BINDING(DART_REGISTER_NATIVE)});
-}
 
 CanvasPath::CanvasPath()
     : path_tracker_(UIDartState::Current()->GetVolatilePathTracker()),
@@ -81,14 +35,8 @@ void CanvasPath::resetVolatility() {
     mutable_path().setIsVolatile(true);
     tracked_path_->frame_count = 0;
     tracked_path_->tracking_volatility = true;
-    path_tracker_->Insert(tracked_path_);
+    path_tracker_->Track(tracked_path_);
   }
-}
-
-void CanvasPath::ReleaseDartWrappableReference() const {
-  FML_DCHECK(path_tracker_);
-  path_tracker_->Erase(tracked_path_);
-  RefCountedDartWrappable::ReleaseDartWrappableReference();
 }
 
 int CanvasPath::getFillType() {
@@ -257,18 +205,21 @@ void CanvasPath::addPath(CanvasPath* path, double dx, double dy) {
 void CanvasPath::addPathWithMatrix(CanvasPath* path,
                                    double dx,
                                    double dy,
-                                   tonic::Float64List& matrix4) {
+                                   Dart_Handle matrix4_handle) {
+  tonic::Float64List matrix4(matrix4_handle);
+
   if (!path) {
+    matrix4.Release();
     Dart_ThrowException(
         ToDart("Path.addPathWithMatrix called with non-genuine Path."));
     return;
   }
 
   SkMatrix matrix = ToSkMatrix(matrix4);
+  matrix4.Release();
   matrix.setTranslateX(matrix.getTranslateX() + dx);
   matrix.setTranslateY(matrix.getTranslateY() + dy);
   mutable_path().addPath(path->path(), matrix, SkPath::kAppend_AddPathMode);
-  matrix4.Release();
   resetVolatility();
 }
 
@@ -285,18 +236,21 @@ void CanvasPath::extendWithPath(CanvasPath* path, double dx, double dy) {
 void CanvasPath::extendWithPathAndMatrix(CanvasPath* path,
                                          double dx,
                                          double dy,
-                                         tonic::Float64List& matrix4) {
+                                         Dart_Handle matrix4_handle) {
+  tonic::Float64List matrix4(matrix4_handle);
+
   if (!path) {
+    matrix4.Release();
     Dart_ThrowException(
         ToDart("Path.addPathWithMatrix called with non-genuine Path."));
     return;
   }
 
   SkMatrix matrix = ToSkMatrix(matrix4);
+  matrix4.Release();
   matrix.setTranslateX(matrix.getTranslateX() + dx);
   matrix.setTranslateY(matrix.getTranslateY() + dy);
   mutable_path().addPath(path->path(), matrix, SkPath::kExtend_AddPathMode);
-  matrix4.Release();
   resetVolatility();
 }
 
@@ -315,18 +269,20 @@ bool CanvasPath::contains(double x, double y) {
 }
 
 void CanvasPath::shift(Dart_Handle path_handle, double dx, double dy) {
-  fml::RefPtr<CanvasPath> path = CanvasPath::Create(path_handle);
+  fml::RefPtr<CanvasPath> path = Create(path_handle);
   auto& other_mutable_path = path->mutable_path();
   mutable_path().offset(dx, dy, &other_mutable_path);
   resetVolatility();
 }
 
 void CanvasPath::transform(Dart_Handle path_handle,
-                           tonic::Float64List& matrix4) {
-  fml::RefPtr<CanvasPath> path = CanvasPath::Create(path_handle);
-  auto& other_mutable_path = path->mutable_path();
-  mutable_path().transform(ToSkMatrix(matrix4), &other_mutable_path);
+                           Dart_Handle matrix4_handle) {
+  tonic::Float64List matrix4(matrix4_handle);
+  auto sk_matrix = ToSkMatrix(matrix4);
   matrix4.Release();
+  fml::RefPtr<CanvasPath> path = Create(path_handle);
+  auto& other_mutable_path = path->mutable_path();
+  mutable_path().transform(sk_matrix, &other_mutable_path);
 }
 
 tonic::Float32List CanvasPath::getBounds() {
@@ -346,7 +302,7 @@ bool CanvasPath::op(CanvasPath* path1, CanvasPath* path2, int operation) {
 }
 
 void CanvasPath::clone(Dart_Handle path_handle) {
-  fml::RefPtr<CanvasPath> path = CanvasPath::Create(path_handle);
+  fml::RefPtr<CanvasPath> path = Create(path_handle);
   // per Skia docs, this will create a fast copy
   // data is shared until the source path or dest path are mutated
   path->mutable_path() = this->path();
